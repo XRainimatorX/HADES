@@ -1,4 +1,4 @@
-# 任務1：定 repo 結構
+# repo 結構
 
 活文件：隨 repo 實際建立與調整而更新。
 
@@ -7,7 +7,7 @@
 ```text
 hades/
 ├── README.md                    是什麼、怎麼跑、去哪找
-├── CONTRIBUTING.md              任務3：開發紀律
+├── CONTRIBUTING.md              開發紀律
 ├── pyproject.toml               依賴分三組：core / dev / train；
 │                                程式入口：hades-run、hades-replay
 ├── .gitignore
@@ -15,7 +15,7 @@ hades/
 ├── .github/
 │   ├── CODEOWNERS               contracts.py 的修改須經項目所有人審核
 │   └── ISSUE_TEMPLATE/
-│       └── work_issue.md        工作 issue 範本（第2階段撰寫）
+│       └── work_issue.md        
 │
 ├── src/hades/                   上機執行的全部
 │   ├── contracts.py             所有封包、狀態機、各層介面
@@ -57,12 +57,12 @@ hades/
 │   └── fixtures/                固定測試片段
 ├── hardware/                    接線圖、pin map、BOM
 └── docs/
-    ├── spec.md                  任務2：封包規格
-    ├── architecture.md          活：系統怎麼運作
-    ├── test-plan.md             活：三個數字怎麼量、什麼不算量到
-    ├── decisions.md             決策紀錄，一份檔案逐條累積
-    ├── PRD.md                   凍結
-    └── plan.md                  凍結：文件4 + 附頁
+    ├── spec.md                  封包規格
+    ├── architecture.md          系統怎麼運作
+    ├── test-plan.md             三個數字怎麼量、什麼不算量到
+    ├── decisions.md             決策紀錄
+    ├── PRD.md                   
+    └── plan.md                  
 ```
 
 ## 二、資料與權重
@@ -99,19 +99,6 @@ hades/
 | Q Quick Config | `src/hades/config.py`、`configs/default.yaml` |
 | R Error Logging | `src/hades/telemetry.py` |
 
-## 四、需求對照
-
-| 需求 | 怎麼滿足 |
-|---|---|
-| 三人能同時開工 | `contracts.py` 先定好介面；每個工作包各自一個檔案，不互相改到 |
-| 契約連函式簽名一起凍結 | `contracts.py` 同時定義封包與各層介面，修改須經審核 |
-| 硬體未定 | 偵測器透過介面呼叫；硬體設定只在 `default.yaml` 一處 |
-| 三個數字量得出來 | 封包帶時間戳欄位；量測在 `bench/`，量法寫在 `test-plan.md` |
-| 上機與訓練分開 | `src/hades/` 上機；`ml/` 不上機，依賴分組安裝 |
-| 資料集與權重在 repo | Git LFS |
-| 私密文件不進 repo | MRD、協議、競賽申請都不在結構內 |
-| 第1階段交付物 | repo 骨架（本文件）；spec → `docs/spec.md` + `contracts.py`；開發紀律 → `CONTRIBUTING.md` |
-
-## 五、第一批決策紀錄
+## 四、第一批決策紀錄
 
 見 [`docs/decisions.md`](decisions.md)。
