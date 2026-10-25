@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+# run logs and benchmark output stay outside version control
+runs/
+bench/reports/
+
+# raw videos are not stored in the repo (see docs/decisions.md #2)
+raw_videos/

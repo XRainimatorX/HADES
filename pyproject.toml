@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hades"
+version = "0.1.0"
+description = "Real-time consumer-drone detection and alerting"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "opencv-python-headless",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "black",
+    "pylint",
+    "mypy",
+    "bandit",
+    "types-PyYAML",
+]
+train = [
+    "ultralytics",
+]
+
+[project.scripts]
+hades-run = "hades.pipeline:main"
+hades-replay = "hades.telemetry:replay_main"
+
+[tool.setuptools.packages.find]
+where = ["src", "."]
+include = ["hades*", "ml*", "bench*"]
+
+[tool.black]
+line-length = 100
+
+[tool.pylint.format]
+max-line-length = 100
+
+[tool.pylint.messages_control]
+disable = ["too-few-public-methods", "too-many-instance-attributes", "unused-argument"]
+
+[tool.mypy]
+strict = true
+mypy_path = "src"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
