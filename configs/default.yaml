@@ -1,0 +1,24 @@
+schema_version: "0.1"
+hardware:
+  name: dev-laptop
+source:
+  type: webcam                  # picam | webcam | video
+  uri: "0"
+  realtime: true
+detector:
+  model_path: models/<model_name>/model.pt
+  min_confidence: 0.25
+tracker:
+  confirm_frames: 3
+  lost_frames: 5
+decision:
+  conf_threshold: 0.50
+  alert_duration_s: 3.0
+  cooldown_s: 5.0
+alert:
+  on_alert:
+    led_mode: blink             # off | on | blink
+    buzzer_mode: pulse          # off | on | pulse
+    laser_on: false
+telemetry:
+  runs_dir: runs
