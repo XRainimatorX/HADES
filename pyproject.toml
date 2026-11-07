@@ -18,6 +18,8 @@ dependencies = [
 dev = [
     "pytest",
     "pytest-cov",
+    "psutil",
+    "types-psutil",
     "black",
     "pylint",
     "mypy",
@@ -49,6 +51,18 @@ disable = ["too-few-public-methods", "too-many-instance-attributes", "unused-arg
 strict = true
 mypy_path = "src"
 
+[[tool.mypy.overrides]]
+module = ["cv2", "cv2.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "."]
+
+[tool.coverage.run]
+source = ["src/hades", "ml", "bench"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true

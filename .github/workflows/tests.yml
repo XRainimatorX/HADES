@@ -1,10 +1,12 @@
-name: ci
+name: tests
 
 on:
-  push:
   pull_request:
+  push:
+    branches: [main]
 
 env:
+  # Check out without downloading any Git LFS files; only the fixtures are pulled below.
   GIT_LFS_SKIP_SMUDGE: "1"
 
 jobs:
@@ -12,13 +14,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Download only tests/fixtures/ from Git LFS
+        run: git lfs pull --include="tests/fixtures/"
+        env:
+          GIT_LFS_SKIP_SMUDGE: "0"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - run: pip install -e ".[dev]"
-      - run: black --check src ml bench tests
-      - run: pylint src ml bench
-      - run: mypy src ml bench
-      - run: bandit -q -r src ml bench
-      # The 90% coverage gate (CONTRIBUTING Step 4) is enabled after the skeleton stage.
-      - run: pytest
+      - run: black --check src ml bench tests          # formatting differs from the shared settings
+      - run: pylint src ml bench                       # style and obvious errors
+      - run: mypy src ml bench                         # type errors
+      - run: bandit -q -r src ml bench                 # known unsafe patterns
+      # No coverage percentage is required yet; the report is shown in the output.
+      - run: pytest --cov --cov-report=term-missing    # program logic and contracts
+      - name: Tests must not read the output folders
+        run: '! grep -rn "open(" tests/ | grep -E "runs/|bench/reports"'   # a match means a test reads an output folder
+      - name: Run tests from a different working directory
+        run: cd /tmp && pytest "$GITHUB_WORKSPACE/tests"   # a failure means a hidden dependency on the working directory
