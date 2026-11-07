@@ -499,3 +499,20 @@ def test_write_report_into_a_folder_names_the_file_by_run_id(tmp_path: Path) -> 
     benchmark.write_report(report, str(tmp_path))
     written = tmp_path / f"{report.run_id}.json"
     assert json.loads(written.read_text(encoding="utf-8"))["run_id"] == report.run_id
+
+
+@pytest.mark.parametrize("folder", ["bench/reports", "bench/reports/"])
+def test_write_report_to_a_folder_that_does_not_exist_yet(tmp_path: Path, folder: str) -> None:
+    """``bench/reports`` works before the folder exists: it is created, not written as a file."""
+    report = _report()
+    benchmark.write_report(report, str(tmp_path / folder))
+    written = tmp_path / "bench" / "reports" / f"{report.run_id}.json"
+    assert written.is_file()
+    assert json.loads(written.read_text(encoding="utf-8")) == asdict(report)
+
+
+def test_write_report_to_an_explicit_file_name_keeps_that_name(tmp_path: Path) -> None:
+    """A path with a file extension is the file itself."""
+    target = tmp_path / "mine.json"
+    benchmark.write_report(_report(), str(target))
+    assert target.is_file()

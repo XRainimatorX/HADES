@@ -16,6 +16,7 @@ import hashlib
 import importlib
 import json
 import math
+import os
 import statistics
 import time
 import uuid
@@ -209,11 +210,13 @@ def run_benchmark(kind: str, config_path: str, clip: str) -> BenchmarkReport:
 def write_report(report: BenchmarkReport, path: str) -> None:
     """Save the report as JSON.
 
-    ``path`` is the file to write; if it is an existing folder the report is
-    written to ``<path>/<run_id>.json``. Missing parent folders are created.
+    ``path`` is either a file or a folder. It is treated as a folder, and the report is
+    written to ``<path>/<run_id>.json``, if it is an existing folder, ends with a path
+    separator, or has no file extension (so ``bench/reports`` works before the folder
+    exists). Missing folders are created.
     """
     target = Path(path)
-    if target.is_dir():
+    if target.is_dir() or path.endswith(("/", os.sep)) or not target.suffix:
         target = target / f"{report.run_id}.json"
     target.parent.mkdir(parents=True, exist_ok=True)
     with open(target, "w", encoding="utf-8") as handle:
