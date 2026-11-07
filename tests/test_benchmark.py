@@ -12,7 +12,7 @@ import hashlib
 import json
 from dataclasses import asdict
 from pathlib import Path
-from typing import Callable, Iterator, Optional
+from typing import Any, Callable, Iterator, Optional
 
 import cv2
 import numpy as np
@@ -20,7 +20,7 @@ import pytest
 from conftest import FIXTURES_DIR, LFS_POINTER_PREFIX, require_real_video, sample_packets
 
 from bench import benchmark
-from hades import contracts
+from hades import contracts, detect, sources
 from hades.contracts import BenchmarkReport, DetectionPacket, FramePacket
 
 MS = 1_000_000
@@ -357,6 +357,95 @@ def test_run_ids_are_unique(make_harness: Callable[[list[float]], Harness]) -> N
     harness.source = StandInSource(1)
     second = benchmark.run_benchmark("latency", str(harness.config), "clip.mp4")
     assert first.run_id != second.run_id
+
+
+# --- configuration and model errors ------------------------------------------
+
+
+def test_config_that_is_not_a_mapping_is_rejected(
+    make_harness: Callable[[list[float]], Harness],
+) -> None:
+    """A configuration file that does not hold sections is reported with its path."""
+    harness = make_harness([1.0])
+    harness.config.write_text("- just\n- a list\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="expected a mapping"):
+        benchmark.run_benchmark("latency", str(harness.config), "clip.mp4")
+
+
+def test_config_without_a_detector_section_is_rejected(
+    make_harness: Callable[[list[float]], Harness],
+) -> None:
+    """A missing section is named in the error."""
+    harness = make_harness([1.0])
+    harness.config.write_text("hardware:\n  name: x\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="'detector' section"):
+        benchmark.run_benchmark("latency", str(harness.config), "clip.mp4")
+
+
+def test_missing_model_file_stops_the_run_before_any_frame_is_read(
+    make_harness: Callable[[list[float]], Harness],
+) -> None:
+    """The model hash needs the file; without it nothing is opened or measured."""
+    harness = make_harness([1.0])
+    harness.model.unlink()
+    with pytest.raises(FileNotFoundError):
+        benchmark.run_benchmark("latency", str(harness.config), "clip.mp4")
+    assert not harness.source.opened
+
+
+# --- A and B are called as their issues define -------------------------------
+
+
+def test_factories_call_a_and_b_with_the_arguments_their_issues_define(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """VideoFileSource(path, realtime=True) and UltralyticsDetector(min_confidence=...)."""
+
+    class FakeSource:
+        """Records how it was constructed."""
+
+        def __init__(self, path: str, realtime: bool) -> None:
+            self.args: tuple[str, bool] = (path, realtime)
+
+    class FakeDetector:
+        """Records how it was constructed."""
+
+        def __init__(self, min_confidence: float) -> None:
+            self.min_confidence = min_confidence
+
+    monkeypatch.setattr(sources, "VideoFileSource", FakeSource, raising=False)
+    monkeypatch.setattr(detect, "UltralyticsDetector", FakeDetector, raising=False)
+    made_source: Any = benchmark._make_source("c.mp4")  # pylint: disable=protected-access
+    made_detector: Any = benchmark._make_detector(0.3)  # pylint: disable=protected-access
+    assert made_source.args == ("c.mp4", True)
+    assert made_detector.min_confidence == 0.3
+
+
+@pytest.mark.parametrize(
+    ("factory", "argument", "name", "package"),
+    [
+        ("_make_source", "c.mp4", "VideoFileSource", "A"),
+        ("_make_detector", 0.3, "UltralyticsDetector", "B"),
+    ],
+)
+def test_missing_a_or_b_class_names_the_work_package(
+    factory: str, argument: object, name: str, package: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Before A and B are delivered, the error says which class and which package is missing."""
+    monkeypatch.delattr(sources, "VideoFileSource", raising=False)
+    monkeypatch.delattr(detect, "UltralyticsDetector", raising=False)
+    with pytest.raises(RuntimeError, match=rf"{name}.*work package {package}"):
+        getattr(benchmark, factory)(argument)
+
+
+def test_fps_is_zero_when_no_time_passed(
+    make_harness: Callable[[list[float]], Harness], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A clock that does not advance gives zero rather than a division error."""
+    harness = make_harness([1.0] * 2)
+    clock(monkeypatch, [5, 5, 5])
+    result = benchmark.run_benchmark("fps", str(harness.config), "clip.mp4").result
+    assert result == {"fps_avg": 0.0, "fps_min": 0.0}
 
 
 # --- 6. unsupported kinds ----------------------------------------------------

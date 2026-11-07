@@ -68,20 +68,28 @@ def _sha256_of(path: str) -> str:
     return digest.hexdigest()
 
 
-def _load_class(module: str, name: str) -> Any:
-    """Look a class up by name, so this module imports before work packages A and B exist."""
-    return getattr(importlib.import_module(module), name)
+def _load_class(module: str, name: str, package: str) -> Any:
+    """Look a class up by name, so this module imports before work packages A and B exist.
+
+    Raises a clear error naming the work package if the class is not there yet.
+    """
+    try:
+        return getattr(importlib.import_module(module), name)
+    except AttributeError as error:
+        raise RuntimeError(
+            f"{module}.{name} was not found; it is delivered by work package {package}"
+        ) from error
 
 
 def _make_source(clip: str) -> Source:
     """Create the video-file source (WP A); the clip is played as a live source."""
-    source: Source = _load_class("hades.sources", "VideoFileSource")(clip, realtime=True)
+    source: Source = _load_class("hades.sources", "VideoFileSource", "A")(clip, realtime=True)
     return source
 
 
 def _make_detector(min_confidence: float) -> Detector:
     """Create the detector (WP B)."""
-    detector: Detector = _load_class("hades.detect", "UltralyticsDetector")(
+    detector: Detector = _load_class("hades.detect", "UltralyticsDetector", "B")(
         min_confidence=min_confidence
     )
     return detector
