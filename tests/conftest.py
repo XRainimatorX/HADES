@@ -1,93 +1,87 @@
+"""Shared test helpers and fixture paths (work package F).
+
+Every work package uses these helpers:
+
+* fixture paths for each file in ``tests/fixtures/``
+* ``require_real_video()`` fails clearly if a fixture is a Git LFS pointer
+* ``sample_packets()`` returns the packets in ``sample_packets.jsonl``
+
+Import the functions with ``from conftest import require_real_video, sample_packets``.
+"""
+
+from __future__ import annotations
+
 import json
-import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
+FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 
-from hades.contracts import (Detection, DetectionPacket, FramePacket,
-                             SystemState)
-
-FIXTURES = ROOT / "tests" / "fixtures"
-LFS_MAGIC = b"version https://git-lfs.github.com/spec/"
+LFS_POINTER_PREFIX = b"version https://git-lfs.github.com/spec/v1"
 
 
-def assert_real_file(path: Path) -> None:
-    """Issue 0, rule 22: fail loudly if a fixture is missing or an LFS pointer."""
-    assert path.is_file(), f"fixture missing: {path}"
-    with path.open("rb") as f:
-        head = f.read(256)
-    assert not head.startswith(LFS_MAGIC), (
-        f"{path.name} is a Git LFS pointer, not the real file. "
-        "Run `git lfs pull` and try again."
-    )
-    assert path.stat().st_size > 0, f"{path.name} is empty"
-    if path.suffix == ".mp4":
-        assert b"ftyp" in head[:16], f"{path.name} does not look like an MP4"
+def require_real_video(path: Path | str) -> Path:
+    """Return the path if it is a real video file; otherwise fail the test.
+
+    Fails with a clear message when the file is missing or is a Git LFS pointer
+    (a small text stub left behind when LFS files were not downloaded).
+    """
+    video = Path(path)
+    if not video.is_file():
+        pytest.fail(f"fixture missing: {video}. Commit it before running this test.")
+    with open(video, "rb") as handle:
+        head = handle.read(len(LFS_POINTER_PREFIX))
+    if head == LFS_POINTER_PREFIX:
+        pytest.fail(
+            f"{video.name} is a Git LFS pointer, not a real video. "
+            "Download it with: git lfs pull --include=tests/fixtures/"
+        )
+    return video
 
 
-# ASSUMPTION: each JSONL line is {"type": "...", "data": {...}}. Adjust here only.
-def _build(obj: dict):
-    kind, data = obj["type"], dict(obj["data"])
-    if kind == "DetectionPacket":
-        data["detections"] = [Detection(**d) for d in data["detections"]]
-        return DetectionPacket(**data)
-    if kind == "SystemState":
-        return SystemState(**data)
-    if kind == "FramePacket":
-        raise ValueError("frames come from the video, not the JSONL")
-    raise ValueError(f"unknown packet type: {kind}")
-
-
-@pytest.fixture(scope="session")
-def packets():
-    path = FIXTURES / "sample_packets.jsonl"
-    assert_real_file(path)
-    out = []
-    with path.open() as f:
-        for line in f:
+def sample_packets() -> list[dict[str, Any]]:
+    """Return every packet in ``tests/fixtures/sample_packets.jsonl`` as a dictionary."""
+    path = FIXTURES_DIR / "sample_packets.jsonl"
+    if not path.is_file():
+        pytest.fail(f"fixture missing: {path}. Commit it before running this test.")
+    packets: list[dict[str, Any]] = []
+    with open(path, encoding="utf-8") as handle:
+        for number, line in enumerate(handle, start=1):
             if line.strip():
-                obj = json.loads(line)
-                if obj["type"] != "FramePacket":
-                    out.append(_build(obj))
-    return out
+                try:
+                    packets.append(json.loads(line))
+                except json.JSONDecodeError as error:
+                    pytest.fail(f"{path.name} line {number} is not valid JSON: {error}")
+    return packets
 
 
-@pytest.fixture(scope="session")
-def states(packets):
-    found = [p for p in packets if isinstance(p, SystemState)]
-    assert found, "sample_packets.jsonl contains no SystemState"
-    return found
+@pytest.fixture(name="drone_daylight_01")
+def fixture_drone_daylight_01() -> Path:
+    """Short clip with one drone in view."""
+    return FIXTURES_DIR / "drone_daylight_01.mp4"
 
 
-@pytest.fixture(scope="session")
-def detection_packet(packets):
-    found = [p for p in packets
-             if isinstance(p, DetectionPacket) and p.detections]
-    assert found, "sample_packets.jsonl has no DetectionPacket with detections"
-    return found[0]
+@pytest.fixture(name="no_drone_01")
+def fixture_no_drone_01() -> Path:
+    """Short clip of empty sky."""
+    return FIXTURES_DIR / "no_drone_01.mp4"
 
 
-SOURCE_TYPE = "video"   # ASSUMPTION: replace with the real SourceType value
+@pytest.fixture(name="head_walk_01")
+def fixture_head_walk_01() -> Path:
+    """Short clip filmed from a helmet while walking."""
+    return FIXTURES_DIR / "head_walk_01.mp4"
 
 
-@pytest.fixture(scope="session")
-def make_frame():
-    """Return make_frame(frame_id) -> FramePacket read from the fixture video."""
-    import cv2
-    path = FIXTURES / "drone_daylight_01.mp4"
-    assert_real_file(path)
+@pytest.fixture(name="sample_packets_path")
+def fixture_sample_packets_path() -> Path:
+    """One example of each Stage 2 packet, in the run-log format."""
+    return FIXTURES_DIR / "sample_packets.jsonl"
 
-    def _make(frame_id: int) -> FramePacket:
-        cap = cv2.VideoCapture(str(path))
-        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)   # ASSUMPTION: id == index
-        ok, image = cap.read()
-        cap.release()
-        assert ok, f"could not read frame {frame_id} from the fixture video"
-        return FramePacket(frame_id=frame_id,
-                           timestamp=int(frame_id * 1e9 / fps),
-                           image=image, source_type=SOURCE_TYPE)
-    return _make
+
+@pytest.fixture(name="test_model")
+def fixture_test_model() -> Path:
+    """Official YOLOv8n pretrained weights, used for format and speed tests."""
+    return FIXTURES_DIR / "test_model.pt"

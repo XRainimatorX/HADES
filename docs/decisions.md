@@ -18,4 +18,6 @@ One file, entries accumulated in order. Entry 1 is reserved for decisions record
     或依換模型程序改用 Apache-2.0 模型
 11  換模型韌性：資料、評估與模型無關的原則確立；
     具體程序於第3階段 G、H 的 issue 中定義
+12  第2階段的 decision 骨架只回報 SCANNING 狀態、不發任何命令，
+    讓 D 的整合驗收有 SystemState 可顯示；閾值、冷卻與狀態轉換於第4階段實作
 ```
