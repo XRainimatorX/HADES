@@ -10,9 +10,8 @@ htmlcov/
 build/
 dist/
 
-# run logs and benchmark output stay outside version control
+# run logs stay outside version control; benchmark reports are committed (bench/reports/)
 runs/
-bench/reports/
 
 # raw videos are not stored in the repo (see docs/decisions.md #2)
 raw_videos/
