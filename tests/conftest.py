@@ -8,6 +8,7 @@ Every work package uses these helpers:
 * ``sample_packets()`` returns the records in ``sample_packets.jsonl`` as dictionaries
 * ``packets``, ``states``, ``detection_packet`` build contract objects from those records
 * ``make_frame(frame_id)`` builds a FramePacket from the fixture video
+* ``write_config()`` writes a configuration file based on ``configs/default.yaml``
 
 Import the functions with ``from conftest import require_real_video, sample_packets``.
 """
@@ -20,10 +21,12 @@ from typing import Any, Callable, Union
 
 import cv2
 import pytest
+import yaml
 
 from hades.contracts import Detection, DetectionPacket, FramePacket, SystemState
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
+DEFAULT_CONFIG = Path(__file__).resolve().parents[1] / "configs" / "default.yaml"
 
 LFS_POINTER_PREFIX = b"version https://git-lfs.github.com/spec/v1"
 
@@ -161,3 +164,17 @@ def fixture_make_frame() -> Callable[[int], FramePacket]:
         return FramePacket(frame_id, int(frame_id * 1e9 / fps), image, "video")
 
     return make
+
+
+def write_config(directory: Path, **sections: dict[str, Any]) -> str:
+    """Write ``config.yaml`` into ``directory``: the default configuration with sections changed.
+
+    Each keyword is a section of the configuration (``source``, ``detector``, ...); its entries
+    replace the default ones. Returns the path of the file.
+    """
+    data = yaml.safe_load(DEFAULT_CONFIG.read_text(encoding="utf-8"))
+    for name, changes in sections.items():
+        data[name].update(changes)
+    path = directory / "config.yaml"
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    return str(path)

@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from hades.alert import OLED_COLS, OLED_ROWS, VirtualOledDisplay, format_lines
-from hades.contracts import SystemState
+from hades.alert import OLED_COLS, OLED_ROWS, MockAlert, VirtualOledDisplay, format_lines
+from hades.contracts import ActuatorCommand, SystemState
 
 SRC = Path(__file__).resolve().parents[1] / "src"
 HARDWARE = {
@@ -136,3 +136,43 @@ def test_no_hardware_modules_loaded_at_runtime() -> None:
         check=True,
     )
     assert out.stdout.strip() == "[]"
+
+
+# the alert mock (pulled forward from work package J)
+def _command(level: int, led: str, buzzer: str, laser: bool, frame_id: int = 1) -> ActuatorCommand:
+    return ActuatorCommand(level, led, buzzer, laser, frame_id, 10, 20)  # type: ignore[arg-type]
+
+
+def test_the_mock_starts_with_every_output_off() -> None:
+    """Before any command the LED, buzzer and laser are off and nothing has been commanded."""
+    status = MockAlert().status()
+    assert (status.led_mode, status.buzzer_mode, status.laser_on) == ("off", "off", False)
+    assert status.last_command_frame_id is None and status.healthy
+
+
+def test_the_mock_applies_a_command_and_reports_it() -> None:
+    """An alert command turns the outputs on and records which frame caused it."""
+    mock = MockAlert()
+    mock.send(_command(1, "blink", "pulse", True, frame_id=42))
+    status = mock.status()
+    assert (status.led_mode, status.buzzer_mode, status.laser_on) == ("blink", "pulse", True)
+    assert status.last_command_frame_id == 42
+    assert status.t_status > 0
+
+
+def test_sending_the_same_command_twice_changes_nothing() -> None:
+    """The second identical command neither changes the outputs nor the history."""
+    mock = MockAlert()
+    mock.send(_command(1, "on", "off", False, frame_id=1))
+    mock.send(_command(1, "on", "off", False, frame_id=2))
+    assert len(mock.history) == 1 and mock.status().last_command_frame_id == 1
+
+
+def test_alert_level_zero_switches_every_output_off() -> None:
+    """Level 0 means no alert, whatever the other fields say."""
+    mock = MockAlert()
+    mock.send(_command(1, "blink", "pulse", True, frame_id=1))
+    mock.send(_command(0, "blink", "pulse", True, frame_id=2))
+    status = mock.status()
+    assert (status.led_mode, status.buzzer_mode, status.laser_on) == ("off", "off", False)
+    assert status.last_command_frame_id == 2 and len(mock.history) == 2
