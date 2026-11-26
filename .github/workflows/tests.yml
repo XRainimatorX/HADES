@@ -29,6 +29,6 @@ jobs:
       # No coverage percentage is required yet; the report is shown in the output.
       - run: pytest --cov --cov-report=term-missing    # program logic and contracts
       - name: Tests must not read the output folders
-        run: '! grep -rn "open(" tests/ | grep -E "runs/|bench/reports"'   # a match means a test reads an output folder
+        run: '! grep -rn --include="*.py" "open(" tests/ | grep -E "runs/|bench/reports"'   # a match means a test reads an output folder
       - name: Run tests from a different working directory
         run: cd /tmp && pytest "$GITHUB_WORKSPACE/tests"   # a failure means a hidden dependency on the working directory
