@@ -2,20 +2,21 @@
 
 from __future__ import annotations
 
+import math
+import time
+from pathlib import Path
+from typing import Any, Optional
+
+import numpy as np
+
 from hades.contracts import (
+    CLASS_NAMES,
     SCHEMA_VERSION,
     Detection,
     DetectionPacket,
     FramePacket,
 )
 
-import math
-import time
-from pathlib import Path
-from typing import Any
-
-import numpy as np
-import yaml
 
 class ModelDetector:
     """Implements ``contracts.Detector``."""
@@ -27,6 +28,31 @@ class ModelDetector:
     def detect(self, frame: FramePacket) -> DetectionPacket:
         """Run the model on one frame."""
         raise NotImplementedError
+
+
+def _is_valid_image(image: Any) -> bool:
+    """True for a non-empty height x width x 3 uint8 array."""
+    return (
+        isinstance(image, np.ndarray)
+        and image.dtype == np.uint8
+        and image.ndim == 3
+        and image.shape[2] == 3
+        and image.shape[0] > 0
+        and image.shape[1] > 0
+    )
+
+
+def _clamp_box(coords: list[float], width: int, height: int) -> Optional[tuple[float, ...]]:
+    """Clamp a box into the image; None if it is not four finite numbers or has no area."""
+    if len(coords) != 4 or not all(math.isfinite(float(c)) for c in coords):
+        return None
+    x1, y1, x2, y2 = (float(c) for c in coords)
+    x1, x2 = min(max(0.0, x1), float(width)), min(max(0.0, x2), float(width))
+    y1, y2 = min(max(0.0, y1), float(height)), min(max(0.0, y2), float(height))
+    if x1 >= x2 or y1 >= y2:
+        return None
+    return (x1, y1, x2, y2)
+
 
 class UltralyticsDetector(ModelDetector):
     """Detect approved HADES classes using a local Ultralytics YOLO model."""
@@ -56,16 +82,7 @@ class UltralyticsDetector(ModelDetector):
             raise FileNotFoundError(f"Model weights not found: {path}")
 
         # Local import: importing hades.detect must never load model weights.
-        from ultralytics import YOLO  # pylint: disable=import-outside-toplevel
-
-        classes_path = Path(__file__).resolve().parents[2] / "data" / "classes.yaml"
-        with classes_path.open("r", encoding="utf-8") as handle:
-            data = yaml.safe_load(handle)
-        if not isinstance(data, dict) or not isinstance(data.get("names"), dict):
-            raise ValueError(f"Invalid class configuration: {classes_path}")
-        if data.get("schema_version") != SCHEMA_VERSION:
-            raise ValueError("data/classes.yaml uses an unsupported schema_version")
-        allowed = {str(value) for value in data["names"].values()}
+        from ultralytics import YOLO  # type: ignore[attr-defined,unused-ignore]  # pylint: disable=import-outside-toplevel
 
         candidate = YOLO(str(path))
         names = candidate.names
@@ -78,7 +95,7 @@ class UltralyticsDetector(ModelDetector):
 
         model_names = {int(class_id): str(name) for class_id, name in pairs}
         approved_ids = sorted(
-            class_id for class_id, name in model_names.items() if name in allowed
+            class_id for class_id, name in model_names.items() if name in CLASS_NAMES
         )
         warmup = np.zeros((self.input_size, self.input_size, 3), dtype=np.uint8)
         candidate.predict(
@@ -100,14 +117,7 @@ class UltralyticsDetector(ModelDetector):
         if frame.schema_version != SCHEMA_VERSION:
             raise ValueError("Unsupported FramePacket schema version")
         image = frame.image
-        if (
-            not isinstance(image, np.ndarray)
-            or image.dtype != np.uint8
-            or image.ndim != 3
-            or image.shape[2] != 3
-            or not image.shape[0]
-            or not image.shape[1]
-        ):
+        if not _is_valid_image(image):
             raise ValueError("FramePacket.image must be nonempty HxWx3 BGR uint8")
 
         # The Ultralytics predictor handles internal resizing and preprocessing;
@@ -127,48 +137,42 @@ class UltralyticsDetector(ModelDetector):
         if not math.isfinite(inference_ms) or inference_ms <= 0:
             raise RuntimeError("Model must report positive inference time in milliseconds")
 
-        detections: list[Detection] = []
-        if result.boxes is not None:
-            box_coords = result.boxes.xyxy.cpu().tolist()
-            box_scores = result.boxes.conf.cpu().tolist()
-            box_classes = result.boxes.cls.cpu().tolist()
-            if not (len(box_coords) == len(box_scores) == len(box_classes)):
-                raise RuntimeError("YOLO boxes, scores and classes have inconsistent lengths")
-
-            height, width = image.shape[:2]
-            for coords, score_raw, class_raw in zip(box_coords, box_scores, box_classes):
-                class_id = int(class_raw)
-                score = float(score_raw)
-                if class_id not in self._approved_ids:
-                    continue
-                if not math.isfinite(score) or not self.min_confidence <= score <= 1:
-                    continue
-                if len(coords) != 4 or not all(math.isfinite(float(c)) for c in coords):
-                    continue
-
-                x1, y1, x2, y2 = (float(c) for c in coords)
-                x1 = min(max(0.0, x1), float(width))
-                x2 = min(max(0.0, x2), float(width))
-                y1 = min(max(0.0, y1), float(height))
-                y2 = min(max(0.0, y2), float(height))
-                if x1 >= x2 or y1 >= y2:
-                    continue
-                detections.append(
-                    Detection(
-                        bbox=(x1, y1, x2, y2),
-                        class_name=self._class_names[class_id],  # type: ignore[arg-type]
-                        confidence=score,
-                    )
-                )
-
-        # NOTE: Issue #4 requires tuple, but contracts.py currently annotates
-        # detections as list[Detection]. Owner should resolve this discrepancy.
-        # Keep the contract class and field names unchanged as required by WP-B.
+        detections = self._convert(result, image.shape[1], image.shape[0])
         return DetectionPacket(
             frame_id=frame.frame_id,
-            detections=tuple(detections),  # type: ignore[arg-type]
+            detections=detections,
             inference_ms=inference_ms,
             timestamp=frame.timestamp,
             schema_version=SCHEMA_VERSION,
             t_detect=time.monotonic_ns(),
         )
+
+    def _convert(self, result: Any, width: int, height: int) -> tuple[Detection, ...]:
+        """Keep approved, confident, valid boxes as plain-Python ``Detection`` objects."""
+        if result.boxes is None:
+            return ()
+        box_coords = result.boxes.xyxy.cpu().tolist()
+        box_scores = result.boxes.conf.cpu().tolist()
+        box_classes = result.boxes.cls.cpu().tolist()
+        if not len(box_coords) == len(box_scores) == len(box_classes):
+            raise RuntimeError("YOLO boxes, scores and classes have inconsistent lengths")
+
+        detections: list[Detection] = []
+        for coords, score_raw, class_raw in zip(box_coords, box_scores, box_classes):
+            class_id = int(class_raw)
+            score = float(score_raw)
+            if class_id not in self._approved_ids:
+                continue
+            if not math.isfinite(score) or not self.min_confidence <= score <= 1:
+                continue
+            box = _clamp_box(coords, width, height)
+            if box is None:
+                continue
+            detections.append(
+                Detection(
+                    bbox=(box[0], box[1], box[2], box[3]),
+                    class_name=self._class_names[class_id],  # type: ignore[arg-type]
+                    confidence=score,
+                )
+            )
+        return tuple(detections)

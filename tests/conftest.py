@@ -3,7 +3,8 @@
 Every work package uses these helpers:
 
 * fixture paths for each file in ``tests/fixtures/``
-* ``require_real_video()`` fails clearly if a fixture is a Git LFS pointer
+* ``require_real_video()`` / ``require_real_file()`` fail clearly if a fixture is missing or a
+  Git LFS pointer
 * ``sample_packets()`` returns the packets in ``sample_packets.jsonl``
 
 Import the functions with ``from conftest import require_real_video, sample_packets``.
@@ -22,23 +23,28 @@ FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 LFS_POINTER_PREFIX = b"version https://git-lfs.github.com/spec/v1"
 
 
-def require_real_video(path: Path | str) -> Path:
-    """Return the path if it is a real video file; otherwise fail the test.
+def require_real_file(path: Path | str) -> Path:
+    """Return the path if it is a real file; otherwise fail the test.
 
     Fails with a clear message when the file is missing or is a Git LFS pointer
     (a small text stub left behind when LFS files were not downloaded).
     """
-    video = Path(path)
-    if not video.is_file():
-        pytest.fail(f"fixture missing: {video}. Commit it before running this test.")
-    with open(video, "rb") as handle:
+    target = Path(path)
+    if not target.is_file():
+        pytest.fail(f"fixture missing: {target}. Commit it before running this test.")
+    with open(target, "rb") as handle:
         head = handle.read(len(LFS_POINTER_PREFIX))
     if head == LFS_POINTER_PREFIX:
         pytest.fail(
-            f"{video.name} is a Git LFS pointer, not a real video. "
+            f"{target.name} is a Git LFS pointer, not the real file. "
             "Download it with: git lfs pull --include=tests/fixtures/"
         )
-    return video
+    return target
+
+
+def require_real_video(path: Path | str) -> Path:
+    """Return the path if it is a real video file; otherwise fail the test (Issue 0, rule 22)."""
+    return require_real_file(path)
 
 
 def sample_packets() -> list[dict[str, Any]]:
