@@ -25,8 +25,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 import psutil
-import yaml
 
+from hades.config import load_config, resolve_path, validate_config
 from hades.contracts import BenchmarkKind, BenchmarkReport, Detector, Source
 
 _now_ns: Callable[[], int] = time.monotonic_ns
@@ -41,23 +41,6 @@ _LATER_STAGES = {
     "false_alarm": "Stage 4",
     "stability": "Stage 5 (work package O)",
 }
-
-
-def _read_config(config_path: str) -> dict[str, object]:
-    """Read the configuration file; only ``yaml.safe_load`` is used."""
-    with open(config_path, encoding="utf-8") as handle:
-        data = yaml.safe_load(handle)
-    if not isinstance(data, dict):
-        raise ValueError(f"{config_path}: expected a mapping at the top level")
-    return data
-
-
-def _section(cfg: dict[str, object], name: str) -> dict[str, object]:
-    """Return one section of the configuration or raise a clear error."""
-    value = cfg.get(name)
-    if not isinstance(value, dict):
-        raise ValueError(f"configuration has no '{name}' section")
-    return value
 
 
 def _sha256_of(path: str) -> str:
@@ -185,12 +168,14 @@ def run_benchmark(kind: str, config_path: str, clip: str) -> BenchmarkReport:
     file, so laptop figures are always labelled as laptop figures.
     """
     _check_kind(kind)
-    cfg = _read_config(config_path)
-    detector_cfg = _section(cfg, "detector")
-    model_path = str(detector_cfg["model_path"])
+    cfg = load_config(config_path)
+    problems = validate_config(cfg)
+    if problems:
+        raise ValueError(f"{config_path} is not valid: " + "; ".join(problems))
+    model_path = str(resolve_path(cfg.detector.model_path))
     model_sha256 = _sha256_of(model_path)
 
-    detector = _make_detector(float(str(detector_cfg["min_confidence"])))
+    detector = _make_detector(cfg.detector.min_confidence)
     detector.load(model_path)
     start_ns, finish_ns, latencies_ms, memory_mb = _measure(_make_source(clip), detector)
     if not latencies_ms:
@@ -200,7 +185,7 @@ def run_benchmark(kind: str, config_path: str, clip: str) -> BenchmarkReport:
     return BenchmarkReport(
         run_id=str(uuid.uuid4()),
         kind=benchmark_kind,
-        hardware=str(_section(cfg, "hardware")["name"]),
+        hardware=cfg.hardware.name,
         model_sha256=model_sha256,
         samples=len(latencies_ms),
         result=_result_for(kind, start_ns, finish_ns, latencies_ms, memory_mb),

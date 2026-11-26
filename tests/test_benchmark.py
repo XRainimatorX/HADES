@@ -17,6 +17,7 @@ from typing import Any, Callable, Iterator, Optional
 import cv2
 import numpy as np
 import pytest
+import yaml
 from conftest import FIXTURES_DIR, LFS_POINTER_PREFIX, require_real_video, sample_packets
 
 from bench import benchmark
@@ -24,6 +25,7 @@ from hades import contracts, detect, sources
 from hades.contracts import BenchmarkReport, DetectionPacket, FramePacket
 
 MS = 1_000_000
+DEFAULT_CONFIG = Path(__file__).resolve().parents[1] / "configs" / "default.yaml"
 
 
 class StandInSource:
@@ -96,11 +98,10 @@ class Harness:
 
     def set_config(self, hardware: str) -> None:
         """Write a configuration file naming the hardware."""
-        self.config.write_text(
-            f"hardware:\n  name: {hardware}\n"
-            f"detector:\n  model_path: {self.model.as_posix()}\n  min_confidence: 0.4\n",
-            encoding="utf-8",
-        )
+        data = yaml.safe_load(DEFAULT_CONFIG.read_text(encoding="utf-8"))
+        data["hardware"]["name"] = hardware
+        data["detector"].update(model_path=self.model.as_posix(), min_confidence=0.4)
+        self.config.write_text(yaml.safe_dump(data), encoding="utf-8")
 
     def make_source(self, clip: str) -> StandInSource:
         """Stand-in for benchmark._make_source."""
@@ -368,7 +369,7 @@ def test_config_that_is_not_a_mapping_is_rejected(
     """A configuration file that does not hold sections is reported with its path."""
     harness = make_harness([1.0])
     harness.config.write_text("- just\n- a list\n", encoding="utf-8")
-    with pytest.raises(ValueError, match="expected a mapping"):
+    with pytest.raises(ValueError, match="top level"):
         benchmark.run_benchmark("latency", str(harness.config), "clip.mp4")
 
 
@@ -378,7 +379,7 @@ def test_config_without_a_detector_section_is_rejected(
     """A missing section is named in the error."""
     harness = make_harness([1.0])
     harness.config.write_text("hardware:\n  name: x\n", encoding="utf-8")
-    with pytest.raises(ValueError, match="'detector' section"):
+    with pytest.raises(ValueError, match="'source'"):
         benchmark.run_benchmark("latency", str(harness.config), "clip.mp4")
 
 
@@ -389,6 +390,19 @@ def test_missing_model_file_stops_the_run_before_any_frame_is_read(
     harness = make_harness([1.0])
     harness.model.unlink()
     with pytest.raises(FileNotFoundError):
+        benchmark.run_benchmark("latency", str(harness.config), "clip.mp4")
+    assert not harness.source.opened
+
+
+def test_an_invalid_configuration_stops_the_run(
+    make_harness: Callable[[list[float]], Harness],
+) -> None:
+    """Out-of-range settings are reported before any frame is read."""
+    harness = make_harness([1.0])
+    data = yaml.safe_load(harness.config.read_text(encoding="utf-8"))
+    data["detector"]["min_confidence"] = 7.0
+    harness.config.write_text(yaml.safe_dump(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="min_confidence"):
         benchmark.run_benchmark("latency", str(harness.config), "clip.mp4")
     assert not harness.source.opened
 

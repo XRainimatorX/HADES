@@ -167,13 +167,6 @@ def test_source_config_carries_resolution_and_frame_rate() -> None:
 
 
 @pytest.mark.xfail(raises=NotImplementedError, strict=True, reason="stub")
-def test_load_config_stub() -> None:
-    from hades import config
-
-    config.load_config(str(ROOT / "configs" / "default.yaml"))
-
-
-@pytest.mark.xfail(raises=NotImplementedError, strict=True, reason="stub")
 def test_validate_dataset_stub() -> None:
     from ml import dataset
 
