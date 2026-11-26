@@ -346,7 +346,7 @@ def test_model_is_hashed_loaded_and_configured(
     assert harness.detector is not None
     assert harness.detector.loaded_path == harness.model.as_posix()
     assert harness.detector.min_confidence == 0.4
-    assert report.schema_version == "0.1"
+    assert report.schema_version == contracts.SCHEMA_VERSION
     assert len(report.run_id) == 36
 
 

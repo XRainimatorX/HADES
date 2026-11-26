@@ -1,4 +1,4 @@
-"""Packet types and layer interfaces for HADES (format version 0.1).
+"""Packet types and layer interfaces for HADES (format version 0.2).
 
 This file is the code form of ``docs/spec.md``. Any change needs the Project
 Owner's approval and must update both files together.
@@ -9,17 +9,18 @@ Timestamps are integer nanoseconds from the monotonic clock unless noted.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal, Optional, Protocol
+from typing import Literal, Optional, Protocol, get_args
 
 import numpy as np
 from numpy.typing import NDArray
 
-SCHEMA_VERSION = "0.1"
+SCHEMA_VERSION = "0.2"
 
 # --- shared value sets ------------------------------------------------------
 
 SourceType = Literal["picam", "webcam", "video"]
 ClassName = Literal["drone"]
+CLASS_NAMES: tuple[str, ...] = get_args(ClassName)  # the only source of class names
 StateName = Literal["IDLE", "SCANNING", "CANDIDATE", "CONFIRMED", "ALERTING", "COOLDOWN"]
 LedMode = Literal["off", "on", "blink"]
 BuzzerMode = Literal["off", "on", "pulse"]
@@ -39,9 +40,14 @@ class FramePacket:
 
     frame_id: int
     timestamp: int  # ns
-    image: NDArray[np.uint8]  # height x width x 3, BGR
+    image: NDArray[np.uint8] = field(compare=False)  # height x width x 3, BGR; read-only
     source_type: SourceType
+    source_id: str = "cam0"  # which camera; always "cam0" in v0.2
     schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        """Make the image read-only; comparing packets never compares pixels."""
+        self.image.flags.writeable = False
 
 
 # --- B: detection -----------------------------------------------------------
@@ -61,7 +67,7 @@ class DetectionPacket:
     """Everything the model found in one frame; ``detections`` may be empty."""
 
     frame_id: int
-    detections: list[Detection]
+    detections: tuple[Detection, ...]
     inference_ms: float
     timestamp: int  # ns, copied from the frame
     t_detect: int  # ns
@@ -87,7 +93,7 @@ class TrackingPacket:
     """Every object currently tracked in one frame; ``targets`` may be empty."""
 
     frame_id: int
-    targets: list[Track]
+    targets: tuple[Track, ...]
     timestamp: int  # ns, copied from the frame
     t_track: int  # ns
     schema_version: str = SCHEMA_VERSION
@@ -174,7 +180,7 @@ class ErrorRecord:
     """One error written into the run log."""
 
     t_error: int  # ns
-    package: str  # work package letter, e.g. "A"
+    package: str  # upper case, e.g. "A" or "DECISION"
     code: str  # upper case, e.g. "SOURCE_LOST"
     message: str
     frame_id: Optional[int]
@@ -230,7 +236,7 @@ class Prediction:
 
     image: str  # path within dataset_v1/
     model: str  # name and version
-    detections: list[Detection]
+    detections: tuple[Detection, ...]
     schema_version: str = SCHEMA_VERSION
 
 
@@ -276,7 +282,7 @@ class ErrorCaseReport:
 
     model: str
     conf: float
-    cases: list[ErrorCase]
+    cases: tuple[ErrorCase, ...]
     schema_version: str = SCHEMA_VERSION
 
 
@@ -294,7 +300,7 @@ class ThresholdSuggestion:
     """Contents of ``threshold_suggestion.yaml``."""
 
     model: str
-    suggestions: list[Suggestion]
+    suggestions: tuple[Suggestion, ...]
     schema_version: str = SCHEMA_VERSION
 
 
@@ -343,7 +349,7 @@ class DemoClip:
 class DemoManifest:
     """Contents of ``data/demo/demo_manifest.yaml``."""
 
-    clips: list[DemoClip]
+    clips: tuple[DemoClip, ...]
     schema_version: str = SCHEMA_VERSION
 
 
@@ -408,6 +414,9 @@ class SourceConfig:
     type: SourceType
     uri: str
     realtime: bool
+    width: int
+    height: int
+    fps: float
 
 
 @dataclass(frozen=True)

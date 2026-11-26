@@ -1,10 +1,10 @@
 # HADES Packet Specification
 
-`docs/spec.md` — Living document. Format version **0.1**.
+`docs/spec.md` — Living document. Format version **0.2**.
 
 For every work package, this document lists the packets it produces, the exact format of each packet, the meaning of every field, and the functions that produce them. The types and signatures here are implemented in `src/hades/contracts.py`; any change requires the Project Owner's approval and must update both files together.
 
-**Notation used in format blocks:** `int`, `float`, `bool`, `str`; `list[X]` is a list of X; `X | null` means the value may be empty; `"a" | "b"` lists the only allowed values; `# ns` marks nanoseconds from the monotonic clock.
+**Notation used in format blocks:** `int`, `float`, `bool`, `str`; `tuple[X]` is a fixed sequence of X (a JSON array in files; an empty result is an empty sequence, never a missing field); `list[str]` is a list of strings; `X | null` means the value may be empty; `"a" | "b"` lists the only allowed values; `# ns` marks nanoseconds from the monotonic clock.
 
 ---
 
@@ -18,9 +18,10 @@ One packet per frame delivered by the camera or video file. It is the starting p
 FramePacket {
   frame_id:        int
   timestamp:       int                          # ns
-  image:           ndarray[height, width, 3]    uint8, BGR
+  image:           ndarray[height, width, 3]    uint8, BGR, read-only
   source_type:     "picam" | "webcam" | "video"
-  schema_version:  str                          "0.1"
+  source_id:       str                          "cam0"
+  schema_version:  str                          "0.2"
 }
 ```
 
@@ -28,9 +29,10 @@ FramePacket {
 |---|---|---|
 | `frame_id` | Integer; starts at 0, +1 per frame | Identifies the frame within a run. Every later packet derived from this frame carries the same ID, so results can be traced back to the exact image. |
 | `timestamp` | Integer, nanoseconds, monotonic clock | The moment the image was obtained. End-to-end latency is measured from this time, so it must be recorded as early as possible. |
-| `image` | Array, height × width × 3, 8-bit, BGR | The picture itself, in the colour order used by OpenCV. |
+| `image` | Array, height × width × 3, 8-bit, BGR | The picture itself, in the colour order used by OpenCV. It is made read-only when the packet is created and is left out when packets are compared. |
 | `source_type` | String: `picam`, `webcam`, or `video` | Where the frame came from. Lets later analysis separate live results from replayed ones. |
-| `schema_version` | String, e.g. `"0.1"` | Version of this packet format. A reader checks it before interpreting the packet. |
+| `source_id` | String; always `"cam0"` in v0.2 | Which camera produced the frame. Fixed for now, so a second camera can be added later without changing the packet. |
+| `schema_version` | String, e.g. `"0.2"` | Version of this packet format. A reader checks it before interpreting the packet. |
 
 **Function signatures**
 
@@ -57,11 +59,11 @@ One packet per frame, containing everything the model found in that frame. A fra
 ```text
 DetectionPacket {
   frame_id:        int
-  detections:      list[Detection]      may be empty
+  detections:      tuple[Detection]     may be empty
   inference_ms:    float
   timestamp:       int                  # ns
   t_detect:        int                  # ns
-  schema_version:  str                  "0.1"
+  schema_version:  str                  "0.2"
 }
 
 Detection {
@@ -74,7 +76,7 @@ Detection {
 | Data | Expected format | Description and meaning |
 |---|---|---|
 | `frame_id` | Integer | The frame these detections belong to. |
-| `detections` | List of Detection; may be empty | Every object the model found above the minimum confidence. |
+| `detections` | Sequence of Detection; may be empty | Every object the model found above the minimum confidence. |
 | `inference_ms` | Decimal, milliseconds | Time spent running the model alone, excluding preparation and post-processing. Shows how fast the model is on the current hardware. |
 | `timestamp` | Integer, nanoseconds | Copied unchanged from the frame, so latency can still be measured from the original capture. |
 | `t_detect` | Integer, nanoseconds, monotonic clock | When this stage finished. Compared with `timestamp`, shows how much delay the detection stage adds. |
@@ -123,7 +125,7 @@ data/
 `classes.yaml`:
 
 ```yaml
-schema_version: "0.1"
+schema_version: "0.2"
 names:
   0: drone
 ```
@@ -211,7 +213,7 @@ RunMetadata {
   hardware:        str
   source_type:     "picam" | "webcam" | "video"
   source_uri:      str
-  schema_version:  str      "0.1"
+  schema_version:  str      "0.2"
 }
 ```
 
@@ -222,12 +224,12 @@ EventRecord {
   type:            "frame" | "detection" | "tracking" | "state"
                    | "command" | "status" | "error"
   ...              all fields of that packet, except image
-  schema_version:  str      "0.1"
+  schema_version:  str      "0.2"
 }
 ```
 
 ```json
-{"type": "frame", "frame_id": 1042, "timestamp": 58213377001200, "source_type": "webcam", "height": 720, "width": 1280, "schema_version": "0.1"}
+{"type": "frame", "frame_id": 1042, "timestamp": 58213377001200, "source_type": "webcam", "source_id": "cam0", "height": 720, "width": 1280, "schema_version": "0.2"}
 ```
 
 | Data | Expected format | Description and meaning |
@@ -283,14 +285,14 @@ BenchmarkReport {
   model_sha256:    str
   samples:         int
   result:          { <name>: float, ... }
-  schema_version:  str      "0.1"
+  schema_version:  str      "0.2"
 }
 ```
 
 ```json
 {"run_id": "3f2c9a1e-...", "kind": "latency", "hardware": "dev-laptop",
  "model_sha256": "9b1e...", "samples": 40,
- "result": {"median_ms": 31.2, "p95_ms": 48.7}, "schema_version": "0.1"}
+ "result": {"median_ms": 31.2, "p95_ms": 48.7}, "schema_version": "0.2"}
 ```
 
 | Data | Expected format | Description and meaning |
@@ -332,7 +334,7 @@ models/<model_name>/
 `model.yaml`:
 
 ```yaml
-schema_version: "0.1"
+schema_version: "0.2"
 name: yolov8n-drone
 version: "0.1.3"
 format: pt                      # pt | onnx | hef | engine
@@ -368,8 +370,8 @@ metrics:
 Prediction {
   image:           str               path within dataset_v1/
   model:           str               name and version
-  detections:      list[Detection]   as in section B
-  schema_version:  str               "0.1"
+  detections:      tuple[Detection]  as in section B
+  schema_version:  str               "0.2"
 }
 ```
 
@@ -377,7 +379,7 @@ Prediction {
 |---|---|---|
 | `image` | String, path | The image that was evaluated. |
 | `model` | String | The model that produced the result. |
-| `detections` | List of Detection | What the model found. Compared with the label file to find mistakes. |
+| `detections` | Sequence of Detection | What the model found. Compared with the label file to find mistakes. |
 | `schema_version` | String | Version of this file format. |
 
 **Function signatures**
@@ -406,8 +408,8 @@ export(model_dir: str, target_format: str)    -> str
 ErrorCaseReport {
   model:           str
   conf:            float              confidence level analysed
-  cases:           list[ErrorCase]
-  schema_version:  str                "0.1"
+  cases:           tuple[ErrorCase]
+  schema_version:  str                "0.2"
 }
 
 ErrorCase {
@@ -436,7 +438,7 @@ ErrorCase {
 `threshold_suggestion.yaml`.
 
 ```yaml
-schema_version: "0.1"
+schema_version: "0.2"
 model: yolov8n-drone-0.1.3
 suggestions:
   - setting: decision.conf_threshold
@@ -474,10 +476,10 @@ One packet per frame, containing every object currently being followed. It turns
 ```text
 TrackingPacket {
   frame_id:        int
-  targets:         list[Track]      may be empty
+  targets:         tuple[Track]     may be empty
   timestamp:       int              # ns
   t_track:         int              # ns
-  schema_version:  str              "0.1"
+  schema_version:  str              "0.2"
 }
 
 Track {
@@ -492,7 +494,7 @@ Track {
 | Data | Expected format | Description and meaning |
 |---|---|---|
 | `frame_id` | Integer | The frame this result belongs to. |
-| `targets` | List of Track; may be empty | Every object currently tracked. |
+| `targets` | Sequence of Track; may be empty | Every object currently tracked. |
 | `timestamp` | Integer, nanoseconds | Copied unchanged from the frame. |
 | `t_track` | Integer, nanoseconds, monotonic clock | When this stage finished. |
 | `schema_version` | String | Version of this packet format. |
@@ -529,7 +531,7 @@ SystemState {
   previous:        same values as state
   frame_id:        int
   timestamp:       int        # ns
-  schema_version:  str        "0.1"
+  schema_version:  str        "0.2"
 }
 ```
 
@@ -554,7 +556,7 @@ ActuatorCommand {
   frame_id:        int
   timestamp:       int        # ns
   t_command:       int        # ns
-  schema_version:  str        "0.1"
+  schema_version:  str        "0.2"
 }
 ```
 
@@ -597,7 +599,7 @@ ActuatorStatus {
   last_command_frame_id:  int | null
   healthy:                bool
   t_status:               int        # ns
-  schema_version:         str        "0.1"
+  schema_version:         str        "0.2"
 }
 ```
 
@@ -638,7 +640,7 @@ IntegrationResult {
   run_id:          str
   source:          "live" | "replay"
   note:            str
-  schema_version:  str        "0.1"
+  schema_version:  str        "0.2"
 }
 ```
 
@@ -674,7 +676,7 @@ StateStyle {
   state:           one of the SystemState values
   label:           str
   colour:          str        hex, e.g. "#FF3B30"
-  schema_version:  str        "0.1"
+  schema_version:  str        "0.2"
 }
 ```
 
@@ -712,7 +714,7 @@ data/demo/
 `demo_manifest.yaml`:
 
 ```yaml
-schema_version: "0.1"
+schema_version: "0.2"
 clips:
   - name: approach_daylight
     file: approach_daylight.mp4
@@ -756,7 +758,7 @@ SessionSummary {
   alerts:             int
   median_latency_ms:  float | null
   errors:             int
-  schema_version:     str        "0.1"
+  schema_version:     str        "0.2"
 }
 ```
 
@@ -851,7 +853,7 @@ DiagnosticStatus {
   state:            one of the SystemState values
   actuator_status:  ActuatorStatus      as in section J
   t_status:         int                 # ns
-  schema_version:   str                 "0.1"
+  schema_version:   str                 "0.2"
 }
 ```
 
@@ -884,13 +886,16 @@ Diagnostics.snapshot()  -> DiagnosticStatus
 `configs/default.yaml`. Each section holds the settings of one part of the system.
 
 ```yaml
-schema_version: "0.1"
+schema_version: "0.2"
 hardware:
   name: dev-laptop
 source:
   type: webcam                  # picam | webcam | video
   uri: "0"
   realtime: true
+  width: 1280
+  height: 720
+  fps: 30.0
 detector:
   model_path: models/<model_name>/model.pt
   min_confidence: 0.25
@@ -916,6 +921,9 @@ telemetry:
 | `source.type` | String: `picam`, `webcam`, `video` | Which video source to use. |
 | `source.uri` | String | Camera ID or video file path. |
 | `source.realtime` | True / false | For video files: play at normal speed (true) or as fast as possible (false). |
+| `source.width` | Integer, pixels | Frame width the source delivers. Frames are resized to this size. |
+| `source.height` | Integer, pixels | Frame height the source delivers. |
+| `source.fps` | Decimal, frames per second | Frame rate the source delivers; for video files it applies only to the virtual Pi camera. |
 | `detector.model_path` | String | Model file to load. |
 | `detector.min_confidence` | Decimal, 0.0–1.0 | Detections below this are discarded immediately. |
 | `tracker.confirm_frames` | Integer | Consecutive frames needed before a target is confirmed. |
@@ -954,18 +962,18 @@ One record per error, written into the run log.
 ```text
 ErrorRecord {
   t_error:         int          # ns
-  package:         str          work package letter, e.g. "A"
+  package:         str          upper case, e.g. "A" or "DECISION"
   code:            str          upper case, e.g. "SOURCE_LOST"
   message:         str
   frame_id:        int | null
-  schema_version:  str          "0.1"
+  schema_version:  str          "0.2"
 }
 ```
 
 | Data | Expected format | Description and meaning |
 |---|---|---|
 | `t_error` | Integer, nanoseconds, monotonic clock | When the error happened. |
-| `package` | String, work package letter | Which part of the system failed, so the fault is located immediately. |
+| `package` | String, upper case: a work package letter or a name such as `DECISION` | Which part of the system failed, so the fault is located immediately. |
 | `code` | String, upper case with underscores | Fixed name for the type of error, so errors can be counted and searched. |
 | `message` | String | Human-readable explanation. |
 | `frame_id` | Integer, or empty | The frame being processed when the error happened, if any. |

@@ -1,10 +1,13 @@
-schema_version: "0.1"
+schema_version: "0.2"
 hardware:
   name: dev-laptop
 source:
   type: webcam                  # picam | webcam | video
   uri: "0"
   realtime: true
+  width: 1280
+  height: 720
+  fps: 30.0
 detector:
   model_path: models/<model_name>/model.pt
   min_confidence: 0.25
