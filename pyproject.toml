@@ -45,6 +45,10 @@ include = ["hades*", "ml*", "bench*"]
 [tool.black]
 line-length = 100
 
+[tool.pylint.typecheck]
+# OpenCV loads its members at import time, so pylint cannot see them
+generated-members = ["cv2.*"]
+
 [tool.pylint.format]
 max-line-length = 100
 
