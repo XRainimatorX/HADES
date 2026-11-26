@@ -24,11 +24,11 @@ Large files (images, videos, model weights) are stored with Git LFS. LFS downloa
 
 **A test that uses a fixture fails with a clear message if the file is missing or is still an LFS pointer.** Run `git lfs pull --include="tests/fixtures/"` and try again.
 
-Run the pipeline and replay a clip:
+Run the pipeline (copy `configs/default.yaml` and set `detector.model_path` to a real weights file first; see `docs/handoff.md`):
 
 ```bash
-hades-run --config configs/default.yaml
-hades-replay --config configs/default.yaml --clip tests/fixtures/drone_daylight_01.mp4
+hades-run --config my.yaml
+hades-run --config my.yaml --clip tests/fixtures/drone_daylight_01.mp4 --max-frames 100
 ```
 
 ---

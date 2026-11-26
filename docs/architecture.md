@@ -59,6 +59,8 @@ hades/
 └── docs/
     ├── spec.md                  封包規格
     ├── architecture.md          系統怎麼運作
+    ├── handoff.md               執行、測試、維護、移交第 3 階段(另有 handoff.zh.md)
+    ├── phases/                  各階段審查報告(凍結)
     ├── test-plan.md             三個數字怎麼量、什麼不算量到
     ├── decisions.md             決策紀錄
     ├── PRD.md                   
@@ -99,7 +101,17 @@ hades/
 | Q Quick Config | `src/hades/config.py`、`configs/default.yaml` |
 | R Error Logging | `src/hades/telemetry.py` |
 
-## 四、第一批決策紀錄
+## 四、第 2 階段結束時的資料流
+
+```text
+sources.py → detect.py → (track.py:第 3 階段) → decide.py → telemetry.py → events.jsonl
+                                                          ↘ alert.py(虛擬 OLED、MockAlert)、monitor.py
+pipeline.py 組裝整條鏈;config.py 載入設定;contracts.py 定義每個封包(schema 0.2)
+```
+
+逐步說明、模組表、執行緒、除錯與維護,見 [`handoff.zh.md`](handoff.zh.md)。
+
+## 五、第一批決策紀錄
 
 見 [`docs/decisions.md`](decisions.md)。
 
@@ -174,6 +186,9 @@ hades/
 └── docs/
     ├── spec.md                  Packet specifications
     ├── architecture.md          How the system works
+    ├── handoff.md               Running, testing, maintaining, and handing over to Stage 3
+    │                            (also handoff.zh.md)
+    ├── phases/                  Review reports for each stage (frozen)
     ├── test-plan.md             How the three metrics are measured
     │                            and what does not count as a measurement
     ├── decisions.md             Decision records
@@ -230,6 +245,17 @@ Account configuration:
 | Q – Quick Config | `src/hades/config.py`, `configs/default.yaml` |
 | R – Error Logging | `src/hades/telemetry.py` |
 
-## 4. Initial Decision Records
+## 4. Data Flow at the End of Stage 2
+
+```text
+sources.py → detect.py → (track.py: Stage 3) → decide.py → telemetry.py → events.jsonl
+                                                          ↘ alert.py (virtual OLED, MockAlert), monitor.py
+pipeline.py assembles the chain; config.py loads the settings; contracts.py defines every packet
+(schema 0.2)
+```
+
+Step-by-step description, module table, threads, debugging and maintenance are in [`handoff.md`](handoff.md).
+
+## 5. Initial Decision Records
 
 See [`docs/decisions.md`](decisions.md).
