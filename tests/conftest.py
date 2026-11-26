@@ -5,7 +5,9 @@ Every work package uses these helpers:
 * fixture paths for each file in ``tests/fixtures/``
 * ``require_real_video()`` / ``require_real_file()`` fail clearly if a fixture is missing or a
   Git LFS pointer
-* ``sample_packets()`` returns the packets in ``sample_packets.jsonl``
+* ``sample_packets()`` returns the records in ``sample_packets.jsonl`` as dictionaries
+* ``packets``, ``states``, ``detection_packet`` build contract objects from those records
+* ``make_frame(frame_id)`` builds a FramePacket from the fixture video
 
 Import the functions with ``from conftest import require_real_video, sample_packets``.
 """
@@ -14,9 +16,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Union
 
+import cv2
 import pytest
+
+from hades.contracts import Detection, DetectionPacket, FramePacket, SystemState
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 
@@ -91,3 +96,68 @@ def fixture_sample_packets_path() -> Path:
 def fixture_test_model() -> Path:
     """Official YOLOv8n pretrained weights, used for format and speed tests."""
     return FIXTURES_DIR / "test_model.pt"
+
+
+# --- contract objects built from the shared fixtures ------------------------------------------
+
+
+def _build(record: dict[str, Any]) -> Union[DetectionPacket, SystemState, None]:
+    """Build the packet a run-log record describes; frame records have no image, so skip them."""
+    fields = {key: value for key, value in record.items() if key != "type"}
+    if record["type"] == "detection":
+        fields["detections"] = tuple(
+            Detection(tuple(d["bbox"]), d["class_name"], d["confidence"])
+            for d in fields["detections"]
+        )
+        return DetectionPacket(**fields)
+    if record["type"] == "state":
+        return SystemState(**fields)
+    return None
+
+
+@pytest.fixture(name="packets", scope="session")
+def fixture_packets() -> list[Union[DetectionPacket, SystemState]]:
+    """The detection and state packets in sample_packets.jsonl, as contract objects."""
+    built = (_build(record) for record in sample_packets())
+    return [packet for packet in built if packet is not None]
+
+
+@pytest.fixture(name="states", scope="session")
+def fixture_states(packets: list[Any]) -> list[SystemState]:
+    """Every SystemState in the sample packets."""
+    found = [p for p in packets if isinstance(p, SystemState)]
+    assert found, "sample_packets.jsonl contains no state record"
+    return found
+
+
+@pytest.fixture(name="detection_packet", scope="session")
+def fixture_detection_packet(packets: list[Any]) -> DetectionPacket:
+    """The first DetectionPacket in the sample packets that holds a detection."""
+    found = [p for p in packets if isinstance(p, DetectionPacket) and p.detections]
+    assert found, "sample_packets.jsonl has no detection record with a detection"
+    return found[0]
+
+
+@pytest.fixture(name="make_frame", scope="session")
+def fixture_make_frame() -> Callable[[int], FramePacket]:
+    """Return ``make_frame(frame_id)``: a FramePacket with that id, read from the fixture video.
+
+    The picture is frame ``frame_id`` of the clip, wrapping round if the id is larger than the
+    clip, so any id from the sample packets can be used with a short clip.
+    """
+    path = require_real_video(FIXTURES_DIR / "drone_daylight_01.mp4")
+
+    def make(frame_id: int) -> FramePacket:
+        capture = cv2.VideoCapture(str(path))
+        try:
+            count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
+            capture.set(cv2.CAP_PROP_POS_FRAMES, frame_id % count)
+            ok, image = capture.read()
+        finally:
+            capture.release()
+        if not ok:
+            pytest.fail(f"could not read a frame from {path.name}")
+        fps = 30.0
+        return FramePacket(frame_id, int(frame_id * 1e9 / fps), image, "video")
+
+    return make

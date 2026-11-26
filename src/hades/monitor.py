@@ -1,63 +1,26 @@
-"""Development web monitor (work packages D and L)."""
+"""Development web monitor (work package D); the state styles belong to work package L.
+
+``WebMonitor`` serves a plain page with the latest frame (with the detection boxes of the same
+frame), the frame rate, the system state and the latest detections. ``publish()`` only stores the
+message as the latest of its type and returns, so it never slows the main loop. One server thread
+is started by ``start()``; nothing starts when the module is imported.
+"""
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SRC_ROOT = PROJECT_ROOT / "src"
-
-if str(SRC_ROOT) not in sys.path:
-    sys.path.insert(0, str(SRC_ROOT))
-
-from hades.contracts import StateStyle
-
-
-# class Monitor:
-#     """Implements ``contracts.WebMonitor``."""
-
-#     def start(self, port: int) -> None:
-#         """Start the web page on the given port."""
-#         raise NotImplementedError
-
-#     def publish(self, message: object) -> None:
-#         """Push any runtime packet to the page."""
-#         raise NotImplementedError
-
-
-# def state_style(state: str) -> StateStyle:
-#     """Return the label and colour for a system state."""
-#     raise NotImplementedError
-
-"""Web monitor: serves the latest frame, state and detections over HTTP."""
-
-import dataclasses
-import io
 import json
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import Any, Optional
 
+import cv2
 import numpy as np
-from PIL import Image, ImageDraw
 
-from hades.contracts import DetectionPacket, FramePacket, SystemState  # adjust module path if different
+from hades.contracts import DetectionPacket, FramePacket, StateStyle, SystemState
 
-FPS_STALE_S = 2.0        # report 0 fps if no new frame was seen for this long
-
-
-# ---- Adapters: the only place that knows BBox / ClassName / StateName -------
-def _name(v) -> str:
-    """Enum -> its name, anything else (str, Literal) -> str(v)."""
-    return str(getattr(v, "name", v))
-
-def _bbox(d) -> list[float]:
-    b = d.bbox
-    if dataclasses.is_dataclass(b):
-        b = dataclasses.astuple(b)
-    return [float(v) for v in b]            # expected order: x1, y1, x2, y2
-# -----------------------------------------------------------------------------
+FPS_STALE_S = 2.0  # report 0 fps if no new frame was seen for this long
+BOX_COLOUR = (0, 255, 0)  # BGR
 
 PAGE = """<!doctype html>
 <html><head><meta charset="utf-8"><title>HADES Monitor</title>
@@ -83,21 +46,33 @@ setInterval(tick, 200);
 </script></body></html>"""
 
 
+def state_style(state: str) -> StateStyle:
+    """Return the label and colour for a system state (work package L, Stage 4)."""
+    raise NotImplementedError
+
+
 class WebMonitor:
-    def __init__(self, jpeg_quality: int = 80) -> None:
+    """Implements ``contracts.WebMonitor``.
+
+    The server listens on ``host`` (this computer only by default), so the page is not exposed to
+    the network unless the host is changed on purpose.
+    """
+
+    def __init__(self, jpeg_quality: int = 80, host: str = "127.0.0.1") -> None:
         self.jpeg_quality = jpeg_quality
+        self.host = host
 
         self._lock = threading.Lock()
-        self._frame: FramePacket | None = None
-        self._detection: DetectionPacket | None = None
-        self._state: SystemState | None = None
+        self._frame: Optional[FramePacket] = None
+        self._detection: Optional[DetectionPacket] = None
+        self._state: Optional[SystemState] = None
 
-        # Touched only by the single server thread, so no lock needed.
-        self._cache = None        # (frame, detection_used, jpeg_bytes)
-        self._fps_prev = None     # (frame_id, timestamp_ns, wall_time, fps)
+        # Touched only by the single server thread, so no lock is needed.
+        self._cache: Optional[tuple[FramePacket, Optional[DetectionPacket], bytes]] = None
+        self._fps_prev: Optional[tuple[int, int, float, float]] = None
 
-        self._server: HTTPServer | None = None
-        self._thread: threading.Thread | None = None
+        self._server: Optional[HTTPServer] = None
+        self._thread: Optional[threading.Thread] = None
 
     # ------------------------------------------------------------------ start
     def start(self, port: int) -> None:
@@ -107,12 +82,14 @@ class WebMonitor:
         monitor = self
 
         class Handler(BaseHTTPRequestHandler):
+            """Serves the page, the latest frame and the latest status."""
+
             timeout = 5
 
-            def log_message(self, *args):
-                pass
+            def log_message(self, format: str, *args: Any) -> None:  # pylint: disable=W0622
+                """Keep the console quiet."""
 
-            def _send(self, code, body, ctype):
+            def _send(self, code: int, body: bytes, ctype: str) -> None:
                 self.send_response(code)
                 self.send_header("Content-Type", ctype)
                 self.send_header("Content-Length", str(len(body)))
@@ -120,30 +97,30 @@ class WebMonitor:
                 self.end_headers()
                 self.wfile.write(body)
 
-            def do_GET(self):
-                path = self.path.split("?")[0]
+            def do_GET(self) -> None:  # pylint: disable=invalid-name
+                """Answer one request."""
+                path = self.path.split("?", maxsplit=1)[0]
                 if path == "/":
                     self._send(200, PAGE.encode(), "text/html; charset=utf-8")
                 elif path == "/frame.jpg":
-                    jpeg = monitor._frame_jpeg()
+                    jpeg = monitor._frame_jpeg()  # pylint: disable=protected-access
                     if jpeg is None:
                         self._send(503, b"no frame yet", "text/plain")
                     else:
                         self._send(200, jpeg, "image/jpeg")
                 elif path == "/status.json":
-                    body = json.dumps(monitor._status()).encode()
+                    body = json.dumps(monitor._status()).encode()  # pylint: disable=W0212
                     self._send(200, body, "application/json")
                 else:
                     self._send(404, b"not found", "text/plain")
 
-        # Plain HTTPServer (not Threading...) -> exactly one server thread.
-        self._server = HTTPServer(("0.0.0.0", port), Handler)
-        self._thread = threading.Thread(
-            target=self._server.serve_forever, daemon=True
-        )
+        # Plain HTTPServer (not a threading one) -> exactly one server thread.
+        self._server = HTTPServer((self.host, port), Handler)
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._thread.start()
 
     def stop(self) -> None:
+        """Stop the server thread."""
         if self._server:
             self._server.shutdown()
             self._server.server_close()
@@ -162,13 +139,12 @@ class WebMonitor:
             # any other packet type is ignored; publish() never raises
 
     # -------------------------------------------------------------- internals
-    def _frame_jpeg(self) -> bytes | None:
+    def _frame_jpeg(self) -> Optional[bytes]:
+        """The latest frame as a JPEG, with boxes only if the detection belongs to that frame."""
         with self._lock:
             frame, det = self._frame, self._detection
         if frame is None:
             return None
-
-        # Boxes only if the detection belongs to the frame being shown.
         if det is not None and det.frame_id != frame.frame_id:
             det = None
 
@@ -177,55 +153,61 @@ class WebMonitor:
             return cache[2]
 
         # Copy first: the FramePacket's own array is never modified.
-        rgb = np.ascontiguousarray(np.array(frame.image, copy=True)[..., ::-1])
-        img = Image.fromarray(rgb)             # BGR -> RGB
+        image = np.array(frame.image, copy=True)
         if det is not None:
-            draw = ImageDraw.Draw(img)
-            for d in det.detections:
-                x1, y1, x2, y2 = _bbox(d)
-                draw.rectangle((x1, y1, x2, y2), outline=(0, 255, 0), width=2)
-                draw.text((x1 + 2, max(0, y1 - 12)),
-                          f"{_name(d.class_name)} {d.confidence:.2f}",
-                          fill=(0, 255, 0))
-        buf = io.BytesIO()
-        img.save(buf, "JPEG", quality=self.jpeg_quality)
-        jpeg = buf.getvalue()
+            for detection in det.detections:
+                x1, y1, x2, y2 = (int(round(v)) for v in detection.bbox)
+                cv2.rectangle(image, (x1, y1), (x2, y2), BOX_COLOUR, 2)
+                label = f"{detection.class_name} {detection.confidence:.2f}"
+                cv2.putText(
+                    image, label, (x1 + 2, max(12, y1 - 4)), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                    BOX_COLOUR, 1,
+                )  # fmt: skip
+        ok, encoded = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, self.jpeg_quality])
+        if not ok:
+            return None
+        jpeg = bytes(encoded.tobytes())
         self._cache = (frame, det, jpeg)
         return jpeg
 
-    def _fps(self, frame: FramePacket | None) -> float:
-        """Frame rate from frame_id / timestamp change between status polls."""
+    def _fps(self, frame: Optional[FramePacket]) -> float:
+        """Frame rate from the change of frame_id and timestamp between status polls."""
         if frame is None:
             return 0.0
         now = time.monotonic()
-        fid, ts = frame.frame_id, frame.timestamp
+        frame_id, stamp = frame.frame_id, frame.timestamp
         prev = self._fps_prev
         if prev is None:
-            self._fps_prev = (fid, ts, now, 0.0)
+            self._fps_prev = (frame_id, stamp, now, 0.0)
             return 0.0
-        pfid, pts, pwall, pfps = prev
-        if fid == pfid and ts == pts:                 # no new frame since last poll
-            return pfps if now - pwall <= FPS_STALE_S else 0.0
-        dt = (ts - pts) / 1e9
-        fps = round((fid - pfid) / dt, 1) if fid > pfid and dt > 0 else 0.0
-        self._fps_prev = (fid, ts, now, fps)
+        prev_id, prev_stamp, prev_wall, prev_fps = prev
+        if frame_id == prev_id and stamp == prev_stamp:  # no new frame since the last poll
+            return prev_fps if now - prev_wall <= FPS_STALE_S else 0.0
+        elapsed = (stamp - prev_stamp) / 1e9
+        fps = (
+            round((frame_id - prev_id) / elapsed, 1) if frame_id > prev_id and elapsed > 0 else 0.0
+        )
+        self._fps_prev = (frame_id, stamp, now, fps)
         return fps
 
-    def _status(self) -> dict:
+    def _status(self) -> dict[str, Any]:
+        """The latest state, frame rate and detections, as JSON-ready values."""
         with self._lock:
             state, det, frame = self._state, self._detection, self._frame
         if det is not None:
-            fid = det.frame_id
+            frame_id: Optional[int] = det.frame_id
         else:
-            fid = frame.frame_id if frame is not None else None
+            frame_id = frame.frame_id if frame is not None else None
         return {
-            "state": _name(state.state) if state is not None else None,
+            "state": state.state if state is not None else None,
             "fps": self._fps(frame),
-            "frame_id": fid,
+            "frame_id": frame_id,
             "detections": [
-                {"bbox": _bbox(d),
-                 "class_name": _name(d.class_name),
-                 "confidence": float(d.confidence)}
-                for d in (det.detections if det is not None else [])
+                {
+                    "bbox": [float(v) for v in d.bbox],
+                    "class_name": d.class_name,
+                    "confidence": float(d.confidence),
+                }
+                for d in (det.detections if det is not None else ())
             ],
         }
