@@ -2,7 +2,7 @@
 
 Living document: updated as the development phases progress.
 
-For differences in scope from Documents 1/2/3, see the separate notes page.
+For differences in scope from Documents 1/2/3, see [`docs/plan_appendix.md`](plan_appendix.md); where it differs from this plan, the appendix decides.
 
 ---
 
