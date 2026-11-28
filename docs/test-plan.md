@@ -163,7 +163,7 @@ cd /tmp && pytest <repository>/tests
 | Contract (spec, contracts, config, classes) | `tests/test_contracts.py`, `tests/test_config.py` | No |
 | A video sources | `tests/test_sources.py` (the webcam test is skipped without a camera; the camera thread is tested with a fake capture) | Yes, the three clips |
 | B detector | `tests/test_detect.py` (real YOLOv8n on the clips; scripted fake YOLO for filtering) | Yes, the clips and `test_model.pt` |
-| C dataset | **Not tested: not started** | — |
+| C dataset | `tests/test_dataset.py` (the tools, on the fixture clips); **`dataset_v1` itself is empty, so no real dataset is tested** | Yes, two clips |
 | D screen and monitor | `tests/test_alert.py`, `tests/test_monitor.py` | Yes, one clip |
 | E run log and replay | `tests/test_telemetry.py` | Yes, one clip |
 | F benchmark | `tests/test_benchmark.py` | No (stand-ins); acceptance needs the clips |

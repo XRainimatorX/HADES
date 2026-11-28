@@ -17,7 +17,7 @@
           一個把以上全部串起來、跑一支影片或一個相機的主程式
 骨架      追蹤器(I)、決策層(狀態機永遠回 SCANNING、從不發命令)、診斷、demo 重播、
           整合檢查、錯誤紀錄、摘要
-尚未      C 資料集、G 訓練、H 誤差分析、Hailo 模型、真實 Pi 相機、真實 OLED、LED 與蜂鳴器驅動
+尚未      C 資料集本身(工具、測試、標註規範已完成;`dataset_v1` 是空的)、G 訓練、H 誤差分析、Hailo 模型、真實 Pi 相機、真實 OLED、LED 與蜂鳴器驅動
 ```
 
 ## 2. 一幀怎麼走
@@ -142,7 +142,7 @@ print(write_report(r, 'bench/reports/'))"        # kind:latency | fps | memory
 | G 訓練 | C 的 `dataset_v1`;`ml/train.py`、`ml/export.py`;benchmark | 一個 `UltralyticsDetector` 載得進去的匯出模型 | 匯出的模型能跑過 `hades-run` 與 `tests/integration`;benchmark 報告是真實的(第 5 節) |
 | H 誤差分析 | 有標註影片的 run 紀錄;`ml/analysis.py` | 在有標註的影片上跑出的 `events.jsonl` | 從紀錄逐幀列出誤報與漏報;**需要真實影片與標註** |
 | I 追蹤 | `track.py`;`DetectionPacket`;`contracts.TrackingPacket` | 主迴圈現在傳的空 `TrackingPacket` | 主迴圈把追蹤器的輸出傳給決策骨架;追蹤器用腳本化偵測測試;狀態遵守設定裡的確認/遺失幀數 |
-| C 資料集 | `ml/dataset.py`;fixtures | 審查報告第 5 節 | Issue C 最終完成標準;**它擋住 G** |
+| C 資料集 | `ml/dataset.py`(已完成)、`data/annotation_guideline.md`(已完成) | 素材與標註工具 | `dataset_v1` 通過 `validate_dataset()`、YOLO 工具能訓練一輪、有人確認框貼在無人機上(Issue C 第 11 節);**它擋住 G** |
 
 **第 3 階段開始前**,第 10 節的清單應該全部打勾。
 
@@ -169,7 +169,8 @@ Webcam       沒有相機時 webcam 測試被跳過
 □ tests.yml 已在 GitHub 的 review_branch 上跑過,並用真實 fixture 全綠
 □ 十週落差與第 3 階段 issue(G、H、I)已決定並寫好
 □ Issue 0 補充已核准(核准管道、契約變更流程、預設值)
-□ WP C 已開始,因為沒有資料集 G 就無法開始
+□ WP C 的素材已蒐集並標註好(工具已存在),因為沒有資料集 G 就無法開始
+□ 標註規範裡的數字已由項目所有人確認
 □ 目標硬體上的真實 benchmark 報告已存在,或已排定日期
 □ 沒寫過這份文件的人,只讀本檔、issue 與審查報告就能回答「第 3 階段我要做什麼」
 ```

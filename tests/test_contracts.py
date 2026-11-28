@@ -161,13 +161,3 @@ def test_source_config_carries_resolution_and_frame_rate() -> None:
     """v0.2 adds source.width, source.height and source.fps to the configuration."""
     names = [f.name for f in dataclasses.fields(contracts.SourceConfig)]
     assert names == ["type", "uri", "realtime", "width", "height", "fps"]
-
-
-# --- skeleton stubs: expected to fail until each work package lands ---------
-
-
-@pytest.mark.xfail(raises=NotImplementedError, strict=True, reason="stub")
-def test_validate_dataset_stub() -> None:
-    from ml import dataset
-
-    dataset.validate_dataset(str(ROOT / "data" / "dataset_v1"))

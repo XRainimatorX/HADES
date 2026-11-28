@@ -17,7 +17,7 @@ Works      A video sources (file, laptop camera, virtual Pi camera)
            A main program that runs all of them on one clip or one camera
 Skeleton   tracker (I), the decision layer (the state machine always says SCANNING and never
            sends a command), diagnostics, demo replay, integration check, error log, summary
-Not yet    C dataset, G training, H error analysis, the Hailo model, the real Pi camera,
+Not yet    C dataset itself (the tools, tests and guideline exist; `dataset_v1` is empty), G training, H error analysis, the Hailo model, the real Pi camera,
            the real OLED, the LED and buzzer drivers
 ```
 
@@ -148,7 +148,7 @@ How to read a figure              Only against the same hardware, model and clip
 | G Training | C's `dataset_v1`; `ml/train.py`, `ml/export.py`; the benchmark | An exported model that `UltralyticsDetector` loads | The exported model runs through `hades-run` and `tests/integration`; the benchmark report is real (section 5) |
 | H Error analysis | Run logs of labelled clips; `ml/analysis.py` | `events.jsonl` of a run on a labelled clip | False positives and false negatives are listed per frame from the log; **it needs the real clips and labels** |
 | I Tracking | `track.py`; `DetectionPacket`; `contracts.TrackingPacket` | The empty `TrackingPacket` the main loop passes today | The main loop passes the tracker's output to the decision skeleton; the tracker is tested with scripted detections; its states obey the confirm/lost frames in the configuration |
-| C Dataset | `ml/dataset.py`; the fixtures | Review report, section 5 | Issue C Final Done Criteria; **it blocks G** |
+| C Dataset | `ml/dataset.py` (done), `data/annotation_guideline.md` (done) | Footage and a labelling tool | `dataset_v1` passes `validate_dataset()`, the YOLO tool trains one pass on it, a person confirms the boxes sit on the drones (Issue C section 11); **it blocks G** |
 
 **Before Stage 3 starts** the checklist in section 10 should be ticked.
 
@@ -177,7 +177,8 @@ Open decisions     Ten-week schedule gap; the two-person fallback; thresholds of
 □ tests.yml has run on GitHub on review_branch and is green with the real fixtures
 □ The ten-week gap and the Stage 3 issues (G, H, I) are decided and written
 □ Issue 0 addendum approved (the approval channel, the contract-change process, the defaults)
-□ WP C is started, because G cannot start without a dataset
+□ WP C's footage is collected and labelled (the tools exist), because G cannot start without a dataset
+□ The numbers in the annotation guideline are confirmed by the Project Owner
 □ A real benchmark report on the target hardware exists, or is scheduled with a date
 □ Someone who did not write this document can answer "what do I do in Stage 3" from this file,
   the issues and the review alone

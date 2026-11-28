@@ -46,3 +46,8 @@ One file, entries accumulated in order. Entry 1 is reserved for decisions record
 24  Python 由 3.11 升為 3.14（3.14.6，最新穩定版；3.15 仍是 beta，不用）。依賴版本不變，
     在 3.14 上重裝後 black、pylint、mypy、bandit、pytest 全部通過（305 通過、1 跳過、
     1 預期失敗）；只在這個環境驗證，GitHub Actions 尚未跑過。取代第21項的 Python 版本
+25  WP C（資料集工具）由項目所有人代為完成：helper 2 來不及做，第2階段內也沒有時間再等。
+    已完成 ml/dataset.py 三個函式、tests/test_dataset.py（27 個測試）、標註規範；
+    dataset_v1 仍是空的，因為需要真實影片與人工標註；Issue C 第11節第1、6、7項未達成。
+    manifest 的 source_clip 欄位寫成「<clip>.mp4」（frame 檔名只帶 clip 名稱，副檔名是假設）；
+    標註規範裡的數字（三分之一、8 像素）是提案，待項目所有人確認

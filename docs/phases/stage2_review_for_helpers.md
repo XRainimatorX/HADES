@@ -14,7 +14,7 @@ Stage 2 review report. **This document is the frozen record of the Stage 2 revie
 |---|---|---|---|---|---|
 | A Video input | dougleungch | [#3](https://github.com/XRainimatorX/HADES/issues/3) | Code did not match the issue; no tests | Matches the issue; 25 tests (1 skipped without a camera) | Real-camera check, real-clip acceptance |
 | B Detection | dougleungch | [#4](https://github.com/XRainimatorX/HADES/issues/4) | Code matched the issue; no tests | 48 tests, 99 % coverage | Accuracy (Stage 3), real-clip acceptance |
-| C Dataset | Greencslethan | [#5](https://github.com/XRainimatorX/HADES/issues/5) | **Not started** | Not started | Everything |
+| C Dataset | Greencslethan | [#5](https://github.com/XRainimatorX/HADES/issues/5) | **Not started** | Tools, tests and guideline written by the Project Owner (see section 5); `dataset_v1` empty | Footage, labelling, real dataset |
 | D Screen and monitor | Greencslethan | [#6](https://github.com/XRainimatorX/HADES/issues/6) | Worked; extra files and window code; tests could not run | Matches the issue; 23 + 14 tests | Real-clip acceptance, Flask question |
 | E Run log and replay | Greencslethan | [#7](https://github.com/XRainimatorX/HADES/issues/7) | Good design; tests could not run | Matches the issue; 45 tests | Real-clip acceptance |
 | F Test harness and benchmark | Project Owner | [#8](https://github.com/XRainimatorX/HADES/issues/8) | Not started | Done; 100 % coverage | Acceptance on real clips |
@@ -27,7 +27,7 @@ Source            the helper branches doug and Greencslethan, as pushed (11/15 t
 CI history        4 helper pushes, all 4 failed at the first check (black --check); pylint, mypy,
                   bandit and pytest were skipped, so no helper test had ever run in CI
 Checks on the     black --check, pylint, mypy, bandit and pytest with coverage, on Python 3.14,
-whole project     all five pass after the integration (pytest: 305 passed, 1 skipped (no camera), 1 expected failure, 94 % coverage)
+whole project     all five pass after the integration (pytest: 332 passed, 1 skipped (no camera), 94 % coverage)
 Test validity     each fixed or new test was checked by breaking the code on purpose (docs/test-plan.md,
                   section 6): a test that did not fail got a better test
 Footage           the three clips and the model are not committed. Everything was checked with the
@@ -182,6 +182,8 @@ pylint src/hades/detect.py && mypy src/hades/detect.py
 
 ## 5. WP C — Dataset (Greencslethan, Issue #5)
 
+**Update, 2026-11-28.** The helper had no time to do this work package in Stage 2, so the Project Owner did the tools, the tests and the annotation guideline (commit after this report was first written). The text below is the state at the review; the update is in the last subsection of this section.
+
 ### What was delivered
 
 **Nothing.** There is no commit that touches a work package C file.
@@ -225,7 +227,30 @@ Questions the issue leaves open and that need an answer from the Project Owner b
 
 ### What is left for you
 
-Everything. If something blocks you, say so in the issue early; the earlier it is known, the cheaper it is to fix.
+Everything below the code; the code itself was done on 2026-11-28 (next subsection). If something blocks you, say so in the issue early; the earlier it is known, the cheaper it is to fix.
+
+### Update: what the Project Owner did on 2026-11-28
+
+```text
+Done      ml/dataset.py: extract_frames(), build_split(), validate_dataset(), with docstrings,
+          types and a clean black, pylint, mypy and bandit run
+          tests/test_dataset.py: 27 tests covering all nine of Issue C section 8, plus the error
+          paths; each was checked by breaking the code on purpose (six deliberate faults, all caught)
+          data/annotation_guideline.md: the six cases of Issue C section 7C, each with an example
+          A local run on stand-in clips (not committed): extract, label, split 0.7/0.15/0.15,
+          validate gave no problems, and no clip appeared in two splits
+Choices   Images are labelled before the split: build_split() takes every .jpg under images/ and
+          its label file, then moves both into train/val/test, one whole clip at a time.
+          The manifest records <clip>.mp4 as the source clip, because the file name carries only
+          the clip name (an assumption). Every split with a ratio above zero gets at least one
+          clip when there are enough clips. validate_dataset() also reports upper-case
+          extensions, files in the wrong folder and a clip in two splits (Issue C section 6).
+Proposal  The numbers in the guideline (a third of the drone, 8 pixels) need the Project Owner's
+          confirmation before labelling starts.
+Not done  dataset_v1 has no images: it needs the footage, a labelling tool approved by the Project
+          Owner, and people to label. Issue C Final Done Criteria 1, 3 (checked by a person), 6 and
+          7 are therefore open; criterion 2 holds by construction and by test.
+```
 
 ---
 

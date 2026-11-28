@@ -14,7 +14,7 @@
 |---|---|---|---|---|---|
 | A 影像輸入 | dougleungch | [#3](https://github.com/XRainimatorX/HADES/issues/3) | 程式與 issue 不符;沒有測試 | 符合 issue;25 個測試(無相機時跳過 1 個) | 實機相機檢查、真實影片驗收 |
 | B 偵測 | dougleungch | [#4](https://github.com/XRainimatorX/HADES/issues/4) | 程式符合 issue;沒有測試 | 48 個測試,覆蓋率 99 % | 準確度(第 3 階段)、真實影片驗收 |
-| C 資料集 | Greencslethan | [#5](https://github.com/XRainimatorX/HADES/issues/5) | **未開始** | 未開始 | 全部 |
+| C 資料集 | Greencslethan | [#5](https://github.com/XRainimatorX/HADES/issues/5) | **未開始** | 工具、測試、標註規範由項目所有人完成(見第 5 節);`dataset_v1` 是空的 | 素材、標註、真實資料集 |
 | D 螢幕與監看 | Greencslethan | [#6](https://github.com/XRainimatorX/HADES/issues/6) | 能運作;多出檔案與視窗程式;測試跑不起來 | 符合 issue;23 + 14 個測試 | 真實影片驗收、Flask 問題 |
 | E 執行紀錄與重播 | Greencslethan | [#7](https://github.com/XRainimatorX/HADES/issues/7) | 設計良好;測試跑不起來 | 符合 issue;45 個測試 | 真實影片驗收 |
 | F 測試框架與 benchmark | 項目所有人 | [#8](https://github.com/XRainimatorX/HADES/issues/8) | 未開始 | 完成;覆蓋率 100 % | 真實影片驗收 |
@@ -26,7 +26,7 @@
 CI 紀錄     helper 推送 4 次,4 次都死在第一道檢查(black --check);pylint、mypy、bandit、pytest
             都被跳過,所以沒有任何 helper 測試在 CI 跑過
 整體檢查    Python 3.14 上跑 black --check、pylint、mypy、bandit、pytest(含覆蓋率);
-            整合後五項全過(pytest:305 通過、1 個跳過(沒有相機)、1 個預期失敗,覆蓋率 94 %)
+            整合後五項全過(pytest:332 通過、1 個跳過(沒有相機),覆蓋率 94 %)
 測試有效性  每個修過或新增的測試都故意弄壞程式確認它會失敗(docs/test-plan.md 第 6 節);
             弄壞後沒失敗的測試,換成更好的測試
 素材        三支影片與模型檔未提交。全部用官方 YOLOv8n 權重與放在 git 之外的合成替代影片驗證。
@@ -172,6 +172,8 @@ pylint src/hades/detect.py && mypy src/hades/detect.py
 
 ## 5. WP C — 資料集(Greencslethan,Issue #5)
 
+**更新,2026-11-28。** helper 在第 2 階段內沒有時間做這個工作包,所以由項目所有人完成工具、測試與標註規範(在本報告初稿之後的提交)。以下是審查當時的狀態;更新在本節最後一個小節。
+
 ### 交付了什麼
 
 **沒有。** 沒有任何一個提交動到工作包 C 的檔案。
@@ -215,7 +217,26 @@ issue 沒回答、需要項目所有人在第 5 步前回覆的問題:素材從�
 
 ### 你還要做的
 
-全部。如果卡住,請盡早在 issue 裡說;越早知道,修正成本越低。
+程式碼以外的全部;程式碼本身已在 2026-11-28 完成(下一小節)。如果卡住,請盡早在 issue 裡說;越早知道,修正成本越低。
+
+### 更新:項目所有人在 2026-11-28 做了什麼
+
+```text
+完成      ml/dataset.py:extract_frames()、build_split()、validate_dataset(),有 docstring、型別,
+          black、pylint、mypy、bandit 全過
+          tests/test_dataset.py:27 個測試,涵蓋 Issue C 第 8 節的全部九項與錯誤路徑;
+          每個都用故意弄壞程式檢查過(六處故意錯誤,全部被抓到)
+          data/annotation_guideline.md:Issue C 第 7C 節的六種情況,各有範例
+          在替代影片上本機跑過(未提交):抽幀、標註、切 0.7/0.15/0.15、驗證,沒有任何問題,
+          也沒有影片同時出現在兩個 split
+選擇      先標註、後切分:build_split() 取 images/ 底下所有 .jpg 與其標註檔,再整支影片地搬進
+          train/val/test。manifest 的 source_clip 寫成 <clip>.mp4,因為檔名只帶 clip 名稱(這是假設)。
+          比例大於 0 的 split,在影片數足夠時至少分到一支影片。validate_dataset() 另外回報
+          大寫副檔名、檔案放錯資料夾、一支影片在兩個 split(Issue C 第 6 節)。
+提案      規範裡的數字(三分之一、8 像素)需要項目所有人確認後才開始標註。
+未完成    dataset_v1 沒有影像:需要素材、項目所有人核准的標註工具、以及負責標註的人。
+          Issue C 最終完成標準第 1、3(要人工檢查)、6、7 項因此尚未達成;第 2 項由建構與測試保證。
+```
 
 ---
 

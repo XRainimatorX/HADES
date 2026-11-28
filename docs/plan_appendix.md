@@ -139,6 +139,8 @@ Fixtures               tests/fixtures/ holds three clips (drone_daylight_01, no_
                        head_walk_01), sample_packets.jsonl and test_model.pt, all committed by the
                        Project Owner before the work packages start (Issue 0). Stage 3 adds
                        distance-marked clips and clips with distractors.
+Work package C         Done by the Project Owner in Stage 2 (tools, tests, guideline) because Helper 2
+                       had no time for it; the labelled dataset itself is still to be made.
 Ten-week schedule      The ruling on the gap between the ten-week table and the work-package
                        stages is TBD.
 Two-person fallback    The arrangement for a two-person team is TBD.
