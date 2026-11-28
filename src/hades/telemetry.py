@@ -85,7 +85,7 @@ def git_info() -> tuple[str, bool]:
     try:
         commit = _git("rev-parse", "--short", "HEAD").strip()
         status = _git("status", "--porcelain")
-    except (OSError, subprocess.SubprocessError):
+    except OSError, subprocess.SubprocessError:
         return "unknown", False
     if not commit:
         return "unknown", False
