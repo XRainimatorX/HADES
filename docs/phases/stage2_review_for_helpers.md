@@ -26,7 +26,7 @@ Source            the helper branches doug and Greencslethan, as pushed (11/15 t
                   merged review_branch
 CI history        4 helper pushes, all 4 failed at the first check (black --check); pylint, mypy,
                   bandit and pytest were skipped, so no helper test had ever run in CI
-Checks on the     black --check, pylint, mypy, bandit and pytest with coverage, on Python 3.11,
+Checks on the     black --check, pylint, mypy, bandit and pytest with coverage, on Python 3.14,
 whole project     all five pass after the integration (pytest: 305 passed, 1 skipped (no camera), 1 expected failure, 94 % coverage)
 Test validity     each fixed or new test was checked by breaking the code on purpose (docs/test-plan.md,
                   section 6): a test that did not fail got a better test

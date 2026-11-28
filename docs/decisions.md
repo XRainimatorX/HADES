@@ -43,3 +43,6 @@ One file, entries accumulated in order. Entry 1 is reserved for decisions record
 23  虛擬 OLED 只在終端機印出（8 行 × 21 字元），不開視窗、不寫檔、不用 Pillow；
     網頁監看預設只綁 127.0.0.1，開放到網路要明確指定 host
 ```
+24  Python 由 3.11 升為 3.14（3.14.6，最新穩定版；3.15 仍是 beta，不用）。依賴版本不變，
+    在 3.14 上重裝後 black、pylint、mypy、bandit、pytest 全部通過（305 通過、1 跳過、
+    1 預期失敗）；只在這個環境驗證，GitHub Actions 尚未跑過。取代第21項的 Python 版本

@@ -61,7 +61,7 @@ Stage 2 shortcut         When a frame holds a detection, the main loop itself se
 ## 4. Run it
 
 ```bash
-python3.11 -m venv .venv && source .venv/bin/activate
+python3.14 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,detect]"
 git lfs pull --include="tests/fixtures/"
 cp configs/default.yaml my.yaml     # then set detector.model_path to tests/fixtures/test_model.pt
@@ -139,7 +139,7 @@ How to read a figure              Only against the same hardware, model and clip
 
 **Moving to the Hailo accelerator (Stage 3 and later).** The detector interface is two functions, `load()` and `detect()`, and the tests call only those. A Hailo detector (HEF model, returned boxes converted to `Detection`) is a second class behind the same functions; do not change the packets. Check that the class names match `contracts.CLASS_NAMES`, that boxes are in original-frame pixels, and that `inference_ms` is the accelerator's time. **None of this exists or was tested yet.**
 
-**Dependencies.** Versions are pinned in `pyproject.toml`. Raise them one at a time and run the whole check; the pins were verified on Python 3.11 only.
+**Dependencies.** Versions are pinned in `pyproject.toml`. Raise them one at a time and run the whole check; the pins were verified on Python 3.14 only.
 
 ## 8. Stage 3 — what to build on
 

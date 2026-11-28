@@ -59,7 +59,7 @@ D 螢幕、監看             終端機畫面與網頁顯示最新的封包
 ## 4. 執行
 
 ```bash
-python3.11 -m venv .venv && source .venv/bin/activate
+python3.14 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,detect]"
 git lfs pull --include="tests/fixtures/"
 cp configs/default.yaml my.yaml     # 然後把 detector.model_path 改成 tests/fixtures/test_model.pt
@@ -133,7 +133,7 @@ print(write_report(r, 'bench/reports/'))"        # kind:latency | fps | memory
 
 **改用 Hailo 加速器(第 3 階段之後)。** 偵測器介面只有兩個函式 `load()` 與 `detect()`,測試也只呼叫這兩個。Hailo 偵測器(HEF 模型,把回傳的框轉成 `Detection`)是同樣兩個函式後面的第二個類別;不要改封包。要確認類別名稱符合 `contracts.CLASS_NAMES`、框是原始影像像素座標、`inference_ms` 是加速器的時間。**這些目前都不存在,也沒測過。**
 
-**依賴。** 版本釘死在 `pyproject.toml`。一次升一個並跑完整檢查;這些版本只在 Python 3.11 驗證過。
+**依賴。** 版本釘死在 `pyproject.toml`。一次升一個並跑完整檢查;這些版本只在 Python 3.14 驗證過。
 
 ## 8. 第 3 階段 — 往哪裡接
 

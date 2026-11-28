@@ -8,12 +8,12 @@ Real-time consumer-drone detection and alerting pipeline: video source → detec
 
 ## Quick start
 
-Python 3.11 or newer. The checks in this repository are run on 3.11.
+Python 3.14 or newer. The checks in this repository are run on 3.14.
 
 ```bash
 git clone https://github.com/XRainimatorX/HADES.git
 cd HADES
-python3.11 -m venv .venv && source .venv/bin/activate
+python3.14 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,detect]"
 git lfs install
 git lfs pull --include="tests/fixtures/"

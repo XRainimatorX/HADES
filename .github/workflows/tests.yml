@@ -20,7 +20,7 @@ jobs:
           GIT_LFS_SKIP_SMUDGE: "0"
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.14"
       - run: pip install -e ".[dev,detect]"
       - run: black --check src ml bench tests          # formatting differs from the shared settings
       - run: pylint src ml bench                       # style and obvious errors

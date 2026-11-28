@@ -7,8 +7,8 @@ name = "hades"
 version = "0.1.0"
 description = "Real-time consumer-drone detection and alerting"
 readme = "README.md"
-requires-python = ">=3.11"
-# Versions are pinned to the ones the checks were run with (Python 3.11).
+requires-python = ">=3.14"
+# Versions are pinned to the ones the checks were run with (Python 3.14).
 dependencies = [
     "numpy==2.4.6",
     "opencv-python-headless==5.1.0.95",

@@ -25,7 +25,7 @@
 來源        helper 分支 doug 與 Greencslethan(原樣,11/15 至 11/22 推送),以及合併後的 review_branch
 CI 紀錄     helper 推送 4 次,4 次都死在第一道檢查(black --check);pylint、mypy、bandit、pytest
             都被跳過,所以沒有任何 helper 測試在 CI 跑過
-整體檢查    Python 3.11 上跑 black --check、pylint、mypy、bandit、pytest(含覆蓋率);
+整體檢查    Python 3.14 上跑 black --check、pylint、mypy、bandit、pytest(含覆蓋率);
             整合後五項全過(pytest:305 通過、1 個跳過(沒有相機)、1 個預期失敗,覆蓋率 94 %)
 測試有效性  每個修過或新增的測試都故意弄壞程式確認它會失敗(docs/test-plan.md 第 6 節);
             弄壞後沒失敗的測試,換成更好的測試
